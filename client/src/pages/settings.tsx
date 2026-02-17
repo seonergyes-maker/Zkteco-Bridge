@@ -10,18 +10,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertForwardingConfigSchema, type ForwardingConfig, type InsertForwardingConfig } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Database, Globe, Copy, CheckCircle, CircleCheck, CircleX, RefreshCw } from "lucide-react";
+import { Settings, Database, Globe, Shield, Copy, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-
-interface MariaDbStatus {
-  connected: boolean;
-  host: string;
-  database: string;
-  user: string;
-  totalRecords?: number;
-  error?: string;
-}
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -31,14 +22,10 @@ export default function SettingsPage() {
     queryKey: ["/api/forwarding-config"],
   });
 
-  const { data: mariaStatus, isLoading: isLoadingMaria, refetch: refetchMaria } = useQuery<MariaDbStatus>({
-    queryKey: ["/api/mariadb/status"],
-  });
-
   const form = useForm<InsertForwardingConfig>({
     resolver: zodResolver(insertForwardingConfigSchema),
     defaultValues: {
-      oracleApiUrl: "mariadb",
+      oracleApiUrl: "",
       oracleApiKey: "",
       enabled: false,
       retryAttempts: 3,
@@ -49,7 +36,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (config) {
       form.reset({
-        oracleApiUrl: config.oracleApiUrl || "mariadb",
+        oracleApiUrl: config.oracleApiUrl,
         oracleApiKey: config.oracleApiKey || "",
         enabled: config.enabled,
         retryAttempts: config.retryAttempts,
@@ -78,9 +65,8 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      refetchMaria();
       if (data.success) {
-        toast({ title: "Conexion exitosa", description: "MariaDB responde correctamente. Tabla 'fichajes' verificada." });
+        toast({ title: "Conexion exitosa", description: "La API de Oracle responde correctamente" });
       } else {
         toast({ title: "Error de conexion", description: data.error, variant: "destructive" });
       }
@@ -100,19 +86,11 @@ export default function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function handleSave(data: InsertForwardingConfig) {
-    saveMutation.mutate({
-      ...data,
-      oracleApiUrl: "mariadb",
-      oracleApiKey: "",
-    });
-  }
-
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Configuracion</h1>
-        <p className="text-muted-foreground">Configuracion del servidor PUSH SDK y reenvio a MariaDB</p>
+        <p className="text-muted-foreground">Configuracion del servidor PUSH SDK y reenvio a Oracle</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -170,136 +148,88 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                Conexion MariaDB
-              </CardTitle>
-              <CardDescription>
-                Base de datos externa donde se reenvian los fichajes
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoadingMaria ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-full" />
-                </div>
-              ) : mariaStatus ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    {mariaStatus.connected ? (
-                      <CircleCheck className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <CircleX className="w-5 h-5 text-red-500" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {mariaStatus.connected ? "Conectado" : "Desconectado"}
-                    </span>
-                    <Button variant="ghost" size="icon" onClick={() => refetchMaria()} data-testid="button-refresh-mariadb">
-                      <RefreshCw className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Host:</span>
-                      <p className="font-mono text-xs" data-testid="text-mariadb-host">{mariaStatus.host || "—"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Base de datos:</span>
-                      <p className="font-mono text-xs" data-testid="text-mariadb-database">{mariaStatus.database || "—"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Usuario:</span>
-                      <p className="font-mono text-xs" data-testid="text-mariadb-user">{mariaStatus.user || "—"}</p>
-                    </div>
-                    {mariaStatus.connected && mariaStatus.totalRecords !== undefined && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              Reenvio a Oracle
+            </CardTitle>
+            <CardDescription>
+              Configura la conexion con tu API de Oracle para reenviar los fichajes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit((data) => saveMutation.mutate(data))} className="space-y-4">
+                  <FormField control={form.control} name="enabled" render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-md border p-3">
                       <div>
-                        <span className="text-muted-foreground">Registros en fichajes:</span>
-                        <p className="font-mono text-xs" data-testid="text-mariadb-records">{mariaStatus.totalRecords}</p>
+                        <FormLabel>Reenvio activo</FormLabel>
+                        <FormDescription className="text-xs">Los eventos se reenviaran automaticamente</FormDescription>
                       </div>
-                    )}
-                  </div>
-                  {mariaStatus.error && (
-                    <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive" data-testid="text-mariadb-error">
-                      {mariaStatus.error}
-                    </div>
-                  )}
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => testMutation.mutate()}
-                    disabled={testMutation.isPending}
-                    data-testid="button-test-mariadb"
-                  >
-                    {testMutation.isPending ? "Probando..." : "Probar conexion"}
-                  </Button>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                Reenvio automatico
-              </CardTitle>
-              <CardDescription>
-                Los fichajes se insertan automaticamente en la tabla 'fichajes' de MariaDB
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : (
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(handleSave)} className="space-y-4">
-                    <FormField control={form.control} name="enabled" render={({ field }) => (
-                      <FormItem className="flex items-center justify-between gap-2 rounded-md border p-3">
-                        <div>
-                          <FormLabel>Reenvio activo</FormLabel>
-                          <FormDescription className="text-xs">Los fichajes se reenviaran automaticamente a MariaDB</FormDescription>
-                        </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-forwarding-enabled" />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="oracleApiUrl" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>URL de la API Oracle</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://tu-api.com/api/fichajes" {...field} data-testid="input-oracle-url" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="oracleApiKey" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>API Key (opcional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="tu-api-key-secreta" type="password" {...field} value={field.value ?? ""} data-testid="input-oracle-key" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="retryAttempts" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Reintentos</FormLabel>
                         <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-forwarding-enabled" />
+                          <Input type="number" min={1} max={10} {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} data-testid="input-retry-attempts" />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )} />
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="retryAttempts" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Reintentos</FormLabel>
-                          <FormControl>
-                            <Input type="number" min={1} max={10} {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} data-testid="input-retry-attempts" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="retryDelayMs" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Delay reintento (ms)</FormLabel>
-                          <FormControl>
-                            <Input type="number" min={1000} max={60000} step={1000} {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} data-testid="input-retry-delay" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={saveMutation.isPending} data-testid="button-save-config">
+                    <FormField control={form.control} name="retryDelayMs" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Delay reintento (ms)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={1000} max={60000} step={1000} {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} data-testid="input-retry-delay" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" className="flex-1" disabled={saveMutation.isPending} data-testid="button-save-config">
                       {saveMutation.isPending ? "Guardando..." : "Guardar configuracion"}
                     </Button>
-                  </form>
-                </Form>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    <Button type="button" variant="outline" onClick={() => testMutation.mutate()} disabled={testMutation.isPending} data-testid="button-test-connection">
+                      {testMutation.isPending ? "Probando..." : "Probar conexion"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
