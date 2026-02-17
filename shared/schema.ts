@@ -1,18 +1,107 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const clients = pgTable("clients", {
+  id: serial("id").primaryKey(),
+  clientId: text("client_id").notNull().unique(),
+  name: text("name").notNull(),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const devices = pgTable("devices", {
+  id: serial("id").primaryKey(),
+  serialNumber: text("serial_number").notNull().unique(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  alias: text("alias"),
+  model: text("model"),
+  firmwareVersion: text("firmware_version"),
+  ipAddress: text("ip_address"),
+  lastSeen: timestamp("last_seen"),
+  active: boolean("active").notNull().default(true),
+  attlogStamp: text("attlog_stamp").default("0"),
+  operlogStamp: text("operlog_stamp").default("0"),
+  attphotoStamp: text("attphoto_stamp").default("0"),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export const attendanceEvents = pgTable("attendance_events", {
+  id: serial("id").primaryKey(),
+  deviceSerial: text("device_serial").notNull(),
+  pin: text("pin").notNull(),
+  timestamp: timestamp("timestamp").notNull(),
+  status: integer("status").notNull().default(0),
+  verify: integer("verify").notNull().default(0),
+  workCode: text("work_code"),
+  forwarded: boolean("forwarded").notNull().default(false),
+  forwardedAt: timestamp("forwarded_at"),
+  forwardError: text("forward_error"),
+  rawData: text("raw_data"),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+});
+
+export const operationLogs = pgTable("operation_logs", {
+  id: serial("id").primaryKey(),
+  deviceSerial: text("device_serial").notNull(),
+  logType: text("log_type").notNull(),
+  content: text("content").notNull(),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+});
+
+export const deviceCommands = pgTable("device_commands", {
+  id: serial("id").primaryKey(),
+  deviceSerial: text("device_serial").notNull(),
+  commandId: text("command_id").notNull(),
+  command: text("command").notNull(),
+  status: text("status").notNull().default("pending"),
+  returnValue: text("return_value"),
+  returnData: text("return_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  executedAt: timestamp("executed_at"),
+});
+
+export const forwardingConfig = pgTable("forwarding_config", {
+  id: serial("id").primaryKey(),
+  oracleApiUrl: text("oracle_api_url").notNull(),
+  oracleApiKey: text("oracle_api_key"),
+  enabled: boolean("enabled").notNull().default(false),
+  retryAttempts: integer("retry_attempts").notNull().default(3),
+  retryDelayMs: integer("retry_delay_ms").notNull().default(5000),
+});
+
+export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
+export const insertDeviceSchema = createInsertSchema(devices).omit({ id: true, lastSeen: true, attlogStamp: true, operlogStamp: true, attphotoStamp: true });
+export const insertAttendanceEventSchema = createInsertSchema(attendanceEvents).omit({ id: true, receivedAt: true });
+export const insertForwardingConfigSchema = createInsertSchema(forwardingConfig).omit({ id: true });
+
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Device = typeof devices.$inferSelect;
+export type InsertDevice = z.infer<typeof insertDeviceSchema>;
+export type AttendanceEvent = typeof attendanceEvents.$inferSelect;
+export type InsertAttendanceEvent = z.infer<typeof insertAttendanceEventSchema>;
+export type OperationLog = typeof operationLogs.$inferSelect;
+export type DeviceCommand = typeof deviceCommands.$inferSelect;
+export type ForwardingConfig = typeof forwardingConfig.$inferSelect;
+export type InsertForwardingConfig = z.infer<typeof insertForwardingConfigSchema>;
+
+export const ATTENDANCE_STATUS: Record<number, string> = {
+  0: "Entrada",
+  1: "Salida",
+  2: "Salida temporal",
+  3: "Regreso",
+  4: "Entrada horas extra",
+  5: "Salida horas extra",
+  8: "Inicio comida",
+  9: "Fin comida",
+};
+
+export const VERIFY_MODE: Record<number, string> = {
+  0: "Contrasena",
+  1: "Huella",
+  2: "Tarjeta",
+  9: "Otro",
+};
