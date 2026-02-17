@@ -1,17 +1,17 @@
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 import {
-  clients, devices, attendanceEvents, operationLogs, deviceCommands, forwardingConfig,
+  clients, devices, attendanceEvents, operationLogs, deviceCommands,
   type Client, type InsertClient,
   type Device, type InsertDevice,
   type AttendanceEvent, type InsertAttendanceEvent,
-  type ForwardingConfig, type InsertForwardingConfig,
   type DeviceCommand,
 } from "@shared/schema";
 
 export interface IStorage {
   getClients(): Promise<Client[]>;
   getClient(id: number): Promise<Client | undefined>;
+  getClientByDeviceSerial(serial: string): Promise<Client | undefined>;
   createClient(data: InsertClient): Promise<Client>;
   updateClient(id: number, data: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: number): Promise<void>;
@@ -40,9 +40,6 @@ export interface IStorage {
   createCommand(serial: string, commandId: string, command: string): Promise<DeviceCommand>;
   updateCommandResult(commandId: string, returnValue: string, returnData?: string): Promise<void>;
 
-  getForwardingConfig(): Promise<ForwardingConfig | null>;
-  saveForwardingConfig(data: InsertForwardingConfig): Promise<ForwardingConfig>;
-
   getDashboardStats(): Promise<{
     totalClients: number;
     totalDevices: number;
@@ -61,6 +58,12 @@ export class DatabaseStorage implements IStorage {
   async getClient(id: number): Promise<Client | undefined> {
     const [client] = await db.select().from(clients).where(eq(clients.id, id));
     return client;
+  }
+
+  async getClientByDeviceSerial(serial: string): Promise<Client | undefined> {
+    const device = await this.getDeviceBySerial(serial);
+    if (!device) return undefined;
+    return this.getClient(device.clientId);
   }
 
   async createClient(data: InsertClient): Promise<Client> {
@@ -208,24 +211,6 @@ export class DatabaseStorage implements IStorage {
       returnData: returnData || null,
       executedAt: new Date(),
     }).where(eq(deviceCommands.commandId, commandId));
-  }
-
-  async getForwardingConfig(): Promise<ForwardingConfig | null> {
-    const [config] = await db.select().from(forwardingConfig).limit(1);
-    return config || null;
-  }
-
-  async saveForwardingConfig(data: InsertForwardingConfig): Promise<ForwardingConfig> {
-    const existing = await this.getForwardingConfig();
-    if (existing) {
-      await db.update(forwardingConfig).set(data).where(eq(forwardingConfig.id, existing.id));
-      const [updated] = await db.select().from(forwardingConfig).where(eq(forwardingConfig.id, existing.id));
-      return updated;
-    }
-    const result = await db.insert(forwardingConfig).values(data);
-    const insertId = result[0].insertId;
-    const [created] = await db.select().from(forwardingConfig).where(eq(forwardingConfig.id, insertId));
-    return created;
   }
 
   async getDashboardStats() {

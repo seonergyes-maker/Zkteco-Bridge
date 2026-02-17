@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertClientSchema, insertDeviceSchema, insertForwardingConfigSchema } from "@shared/schema";
+import { insertClientSchema, insertDeviceSchema } from "@shared/schema";
 import { log } from "./index";
 
 function parseZktecoTimestamp(timeStr: string): Date | null {
@@ -17,24 +17,25 @@ function parseZktecoTimestamp(timeStr: string): Date | null {
 }
 
 async function forwardEvent(event: any) {
-  const config = await storage.getForwardingConfig();
-  if (!config || !config.enabled) return;
+  const client = await storage.getClientByDeviceSerial(event.deviceSerial);
+  if (!client || !client.forwardingEnabled || !client.oracleApiUrl) return;
 
-  for (let attempt = 0; attempt < config.retryAttempts; attempt++) {
+  const retryAttempts = client.retryAttempts || 3;
+  const retryDelayMs = client.retryDelayMs || 5000;
+
+  for (let attempt = 0; attempt < retryAttempts; attempt++) {
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (config.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${config.oracleApiKey}`;
+      if (client.oracleApiKey) {
+        headers["Authorization"] = `Bearer ${client.oracleApiKey}`;
       }
 
-      const device = await storage.getDeviceBySerial(event.deviceSerial);
-
-      const response = await fetch(config.oracleApiUrl, {
+      const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
         body: JSON.stringify({
           deviceSerial: event.deviceSerial,
-          clientId: device?.clientId,
+          clientId: client.clientId,
           pin: event.pin,
           timestamp: event.timestamp,
           status: event.status,
@@ -49,17 +50,17 @@ async function forwardEvent(event: any) {
       }
 
       const errorText = await response.text();
-      if (attempt === config.retryAttempts - 1) {
+      if (attempt === retryAttempts - 1) {
         await storage.markEventForwardError(event.id, `HTTP ${response.status}: ${errorText}`);
       }
     } catch (err: any) {
-      if (attempt === config.retryAttempts - 1) {
+      if (attempt === retryAttempts - 1) {
         await storage.markEventForwardError(event.id, err.message);
       }
     }
 
-    if (attempt < config.retryAttempts - 1) {
-      await new Promise(resolve => setTimeout(resolve, config.retryDelayMs));
+    if (attempt < retryAttempts - 1) {
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
     }
   }
 }
@@ -385,20 +386,36 @@ export async function registerRoutes(
     res.json({ forwarded, total: pending.length });
   });
 
-  // Forwarding config
-  app.get("/api/forwarding-config", async (_req: Request, res: Response) => {
-    const config = await storage.getForwardingConfig();
-    res.json(config);
-  });
-
-  app.post("/api/forwarding-config", async (req: Request, res: Response) => {
-    const parsed = insertForwardingConfigSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ message: parsed.error.message });
+  app.post("/api/clients/:id/test-forwarding", async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const client = await storage.getClient(id);
+    if (!client) {
+      res.status(404).json({ message: "Cliente no encontrado" });
       return;
     }
-    const config = await storage.saveForwardingConfig(parsed.data);
-    res.json(config);
+    if (!client.oracleApiUrl) {
+      res.json({ success: false, error: "No hay URL de API configurada para este cliente" });
+      return;
+    }
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (client.oracleApiKey) {
+        headers["Authorization"] = `Bearer ${client.oracleApiKey}`;
+      }
+      const response = await fetch(client.oracleApiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ test: true, clientId: client.clientId, timestamp: new Date().toISOString() }),
+      });
+      if (response.ok) {
+        res.json({ success: true });
+      } else {
+        const text = await response.text();
+        res.json({ success: false, error: `HTTP ${response.status}: ${text.substring(0, 200)}` });
+      }
+    } catch (err: any) {
+      res.json({ success: false, error: err.message });
+    }
   });
 
   // Commands API
@@ -491,33 +508,6 @@ export async function registerRoutes(
       res.json(cmd);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/forwarding-config/test", async (_req: Request, res: Response) => {
-    const config = await storage.getForwardingConfig();
-    if (!config) {
-      res.json({ success: false, error: "No hay configuracion de reenvio" });
-      return;
-    }
-    try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (config.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${config.oracleApiKey}`;
-      }
-      const response = await fetch(config.oracleApiUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
-      });
-      if (response.ok) {
-        res.json({ success: true });
-      } else {
-        const text = await response.text();
-        res.json({ success: false, error: `HTTP ${response.status}: ${text.substring(0, 200)}` });
-      }
-    } catch (err: any) {
-      res.json({ success: false, error: err.message });
     }
   });
 

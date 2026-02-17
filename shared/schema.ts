@@ -10,6 +10,11 @@ export const clients = mysqlTable("clients", {
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   active: boolean("active").notNull().default(true),
+  oracleApiUrl: text("oracle_api_url"),
+  oracleApiKey: text("oracle_api_key"),
+  forwardingEnabled: boolean("forwarding_enabled").notNull().default(false),
+  retryAttempts: int("retry_attempts").notNull().default(3),
+  retryDelayMs: int("retry_delay_ms").notNull().default(5000),
   createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
 });
 
@@ -63,19 +68,9 @@ export const deviceCommands = mysqlTable("device_commands", {
   executedAt: datetime("executed_at"),
 });
 
-export const forwardingConfig = mysqlTable("forwarding_config", {
-  id: serial("id").primaryKey(),
-  oracleApiUrl: text("oracle_api_url").notNull(),
-  oracleApiKey: text("oracle_api_key"),
-  enabled: boolean("enabled").notNull().default(false),
-  retryAttempts: int("retry_attempts").notNull().default(3),
-  retryDelayMs: int("retry_delay_ms").notNull().default(5000),
-});
-
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
 export const insertDeviceSchema = createInsertSchema(devices).omit({ id: true, lastSeen: true, attlogStamp: true, operlogStamp: true, attphotoStamp: true });
 export const insertAttendanceEventSchema = createInsertSchema(attendanceEvents).omit({ id: true, receivedAt: true });
-export const insertForwardingConfigSchema = createInsertSchema(forwardingConfig).omit({ id: true });
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -85,8 +80,6 @@ export type AttendanceEvent = typeof attendanceEvents.$inferSelect;
 export type InsertAttendanceEvent = z.infer<typeof insertAttendanceEventSchema>;
 export type OperationLog = typeof operationLogs.$inferSelect;
 export type DeviceCommand = typeof deviceCommands.$inferSelect;
-export type ForwardingConfig = typeof forwardingConfig.$inferSelect;
-export type InsertForwardingConfig = z.infer<typeof insertForwardingConfigSchema>;
 
 export const ATTENDANCE_STATUS: Record<number, string> = {
   0: "Entrada",

@@ -51,12 +51,11 @@ shared/
 - `/api/events/pending-count` - Count of unforwarded events
 - `/api/events/retry-forward` - Retry forwarding pending events
 - `/api/commands` - GET (list command history), POST (send command to device)
-- `/api/forwarding-config` - Oracle forwarding configuration
+- `/api/clients/:id/test-forwarding` - Test Oracle connection for specific client
 
 ## Database Tables
-- `clients` - Client registry with custom IDs
+- `clients` - Client registry with custom IDs, per-client Oracle forwarding config
 - `devices` - ZKTeco devices with serial numbers, linked to clients
 - `attendance_events` - All attendance records with forwarding status
 - `operation_logs` - Device operation logs
 - `device_commands` - Pending/executed device commands
-- `forwarding_config` - Oracle API forwarding settings
