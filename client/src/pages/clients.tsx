@@ -13,7 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Building2, Search, Pencil, Trash2, Database, Send, Wifi, WifiOff } from "lucide-react";
+import { Plus, Building2, Search, Pencil, Trash2, Database, Send, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -21,6 +21,7 @@ export default function Clients() {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [search, setSearch] = useState("");
+  const [maskedApiKey, setMaskedApiKey] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: clients, isLoading } = useQuery<Client[]>({
@@ -107,6 +108,7 @@ export default function Clients() {
 
   function openEdit(client: Client) {
     setEditingClient(client);
+    setMaskedApiKey(client.oracleApiKey || null);
     form.reset({
       clientId: client.clientId,
       name: client.name,
@@ -114,7 +116,7 @@ export default function Clients() {
       contactPhone: client.contactPhone || "",
       active: client.active,
       oracleApiUrl: client.oracleApiUrl || "",
-      oracleApiKey: client.oracleApiKey || "",
+      oracleApiKey: "",
       forwardingEnabled: client.forwardingEnabled,
       retryAttempts: client.retryAttempts,
       retryDelayMs: client.retryDelayMs,
@@ -124,13 +126,18 @@ export default function Clients() {
 
   function openNew() {
     setEditingClient(null);
+    setMaskedApiKey(null);
     form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000 });
     setOpen(true);
   }
 
   function onSubmit(data: InsertClient) {
     if (editingClient) {
-      updateMutation.mutate({ id: editingClient.id, data });
+      const updateData = { ...data };
+      if (!updateData.oracleApiKey || updateData.oracleApiKey.trim() === "") {
+        delete (updateData as any).oracleApiKey;
+      }
+      updateMutation.mutate({ id: editingClient.id, data: updateData });
     } else {
       createMutation.mutate(data);
     }
@@ -222,10 +229,25 @@ export default function Clients() {
                     )} />
                     <FormField control={form.control} name="oracleApiKey" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>API Key (opcional)</FormLabel>
+                        <FormLabel className="flex items-center gap-2">
+                          API Key (opcional)
+                          <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                          <span className="text-xs font-normal text-muted-foreground">Cifrada AES-256</span>
+                        </FormLabel>
                         <FormControl>
-                          <Input placeholder="tu-api-key-secreta" type="password" {...field} value={field.value ?? ""} data-testid="input-oracle-key" />
+                          <Input
+                            placeholder={editingClient && maskedApiKey ? `Clave actual: ${maskedApiKey}` : "tu-api-key-secreta"}
+                            type="password"
+                            {...field}
+                            value={field.value ?? ""}
+                            data-testid="input-oracle-key"
+                          />
                         </FormControl>
+                        {editingClient && maskedApiKey && (
+                          <FormDescription className="text-xs">
+                            Dejar vacio para mantener la clave actual. Escribir una nueva clave para reemplazarla.
+                          </FormDescription>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )} />

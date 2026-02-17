@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertDeviceSchema } from "@shared/schema";
 import { log } from "./index";
+import { encrypt, decrypt, maskApiKey, isEncrypted } from "./crypto";
 
 function parseZktecoTimestamp(timeStr: string): Date | null {
   const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
@@ -16,6 +17,13 @@ function parseZktecoTimestamp(timeStr: string): Date | null {
   return d;
 }
 
+function maskClientForResponse(client: any) {
+  return {
+    ...client,
+    oracleApiKey: maskApiKey(client.oracleApiKey),
+  };
+}
+
 async function forwardEvent(event: any) {
   const client = await storage.getClientByDeviceSerial(event.deviceSerial);
   if (!client || !client.forwardingEnabled || !client.oracleApiUrl) return;
@@ -27,7 +35,7 @@ async function forwardEvent(event: any) {
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (client.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${client.oracleApiKey}`;
+        headers["Authorization"] = `Bearer ${decrypt(client.oracleApiKey)}`;
       }
 
       const response = await fetch(client.oracleApiUrl, {
@@ -69,6 +77,19 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Encrypt any existing plaintext API keys on startup
+  try {
+    const allClients = await storage.getClients();
+    for (const client of allClients) {
+      if (client.oracleApiKey && !isEncrypted(client.oracleApiKey)) {
+        await storage.updateClient(client.id, { oracleApiKey: encrypt(client.oracleApiKey) });
+        log(`[Security] Encrypted API key for client ${client.clientId}`, "security");
+      }
+    }
+  } catch (err: any) {
+    log(`[Security] Error encrypting existing keys: ${err.message}`, "error");
+  }
 
   // ===== ZKTeco PUSH SDK Protocol Endpoints =====
 
@@ -286,7 +307,7 @@ export async function registerRoutes(
   // Clients CRUD
   app.get("/api/clients", async (_req: Request, res: Response) => {
     const list = await storage.getClients();
-    res.json(list);
+    res.json(list.map(maskClientForResponse));
   });
 
   app.post("/api/clients", async (req: Request, res: Response) => {
@@ -296,8 +317,12 @@ export async function registerRoutes(
       return;
     }
     try {
-      const client = await storage.createClient(parsed.data);
-      res.json(client);
+      const data = { ...parsed.data };
+      if (data.oracleApiKey) {
+        data.oracleApiKey = encrypt(data.oracleApiKey);
+      }
+      const client = await storage.createClient(data);
+      res.json(maskClientForResponse(client));
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -305,12 +330,20 @@ export async function registerRoutes(
 
   app.patch("/api/clients/:id", async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
-    const client = await storage.updateClient(id, req.body);
+    const updateData = { ...req.body };
+    if (updateData.oracleApiKey !== undefined) {
+      if (updateData.oracleApiKey && updateData.oracleApiKey.trim() !== "") {
+        updateData.oracleApiKey = encrypt(updateData.oracleApiKey);
+      } else {
+        updateData.oracleApiKey = null;
+      }
+    }
+    const client = await storage.updateClient(id, updateData);
     if (!client) {
       res.status(404).json({ message: "Cliente no encontrado" });
       return;
     }
-    res.json(client);
+    res.json(maskClientForResponse(client));
   });
 
   app.delete("/api/clients/:id", async (req: Request, res: Response) => {
@@ -400,7 +433,7 @@ export async function registerRoutes(
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (client.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${client.oracleApiKey}`;
+        headers["Authorization"] = `Bearer ${decrypt(client.oracleApiKey)}`;
       }
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
