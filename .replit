@@ -37,3 +37,10 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+MARIA_DB_HOST = "vred.es"
+MARIA_DB_USER = "Zkteko"
+MARIA_DB_NAME = "Zkteko"
