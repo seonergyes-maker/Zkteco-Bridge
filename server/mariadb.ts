@@ -3,6 +3,13 @@ import { log } from "./index";
 
 let pool: mysql.Pool | null = null;
 
+function resetPool() {
+  if (pool) {
+    pool.end().catch(() => {});
+    pool = null;
+  }
+}
+
 export function getMariaDbPool(): mysql.Pool | null {
   if (pool) return pool;
 
@@ -12,7 +19,6 @@ export function getMariaDbPool(): mysql.Pool | null {
   const database = process.env.MARIA_DB_NAME;
 
   if (!host || !user || !password || !database) {
-    log("[MariaDB] Missing connection credentials in environment variables", "mariadb");
     return null;
   }
 
@@ -38,15 +44,17 @@ export function getMariaDbPool(): mysql.Pool | null {
 
 export async function testMariaDbConnection(): Promise<{ success: boolean; error?: string }> {
   try {
+    resetPool();
     const p = getMariaDbPool();
     if (!p) {
-      return { success: false, error: "Credenciales de MariaDB no configuradas" };
+      return { success: false, error: "Credenciales de MariaDB no configuradas en variables de entorno" };
     }
     const conn = await p.getConnection();
     await conn.ping();
     conn.release();
     return { success: true };
   } catch (err: any) {
+    resetPool();
     return { success: false, error: err.message };
   }
 }
@@ -84,22 +92,33 @@ export async function insertFichaje(data: {
   verify: number;
   workCode: string | null;
 }): Promise<void> {
-  const p = getMariaDbPool();
-  if (!p) throw new Error("MariaDB no disponible");
+  let p = getMariaDbPool();
+  if (!p) {
+    resetPool();
+    p = getMariaDbPool();
+    if (!p) throw new Error("MariaDB no disponible - credenciales no configuradas");
+  }
 
-  await p.execute(
-    `INSERT INTO fichajes (device_serial, client_id, pin, timestamp, status, verify, work_code)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.deviceSerial,
-      data.clientId,
-      data.pin,
-      data.timestamp,
-      data.status,
-      data.verify,
-      data.workCode,
-    ]
-  );
+  try {
+    await p.execute(
+      `INSERT INTO fichajes (device_serial, client_id, pin, timestamp, status, verify, work_code)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.deviceSerial,
+        data.clientId,
+        data.pin,
+        data.timestamp,
+        data.status,
+        data.verify,
+        data.workCode,
+      ]
+    );
+  } catch (err: any) {
+    if (err.code === "ECONNREFUSED" || err.code === "ETIMEDOUT" || err.code === "PROTOCOL_CONNECTION_LOST") {
+      resetPool();
+    }
+    throw err;
+  }
 }
 
 export async function getMariaDbStatus(): Promise<{
@@ -121,10 +140,19 @@ export async function getMariaDbStatus(): Promise<{
     }
     const conn = await p.getConnection();
     await conn.ping();
-    const [rows] = await conn.execute("SELECT COUNT(*) as total FROM fichajes") as any;
+
+    let totalRecords: number | undefined;
+    try {
+      const [rows] = await conn.execute("SELECT COUNT(*) as total FROM fichajes") as any;
+      totalRecords = rows[0]?.total || 0;
+    } catch {
+      totalRecords = undefined;
+    }
+
     conn.release();
-    return { connected: true, host, database, user, totalRecords: rows[0]?.total || 0 };
+    return { connected: true, host, database, user, totalRecords };
   } catch (err: any) {
+    resetPool();
     return { connected: false, host, database, user, error: err.message };
   }
 }
