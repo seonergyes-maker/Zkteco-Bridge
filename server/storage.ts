@@ -63,12 +63,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createClient(data: InsertClient): Promise<Client> {
-    const [client] = await db.insert(clients).values(data).returning();
+    const result = await db.insert(clients).values(data);
+    const insertId = result[0].insertId;
+    const [client] = await db.select().from(clients).where(eq(clients.id, insertId));
     return client;
   }
 
   async updateClient(id: number, data: Partial<InsertClient>): Promise<Client | undefined> {
-    const [client] = await db.update(clients).set(data).where(eq(clients.id, id)).returning();
+    await db.update(clients).set(data).where(eq(clients.id, id));
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
     return client;
   }
 
@@ -92,12 +95,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDevice(data: InsertDevice): Promise<Device> {
-    const [device] = await db.insert(devices).values(data).returning();
+    const result = await db.insert(devices).values(data);
+    const insertId = result[0].insertId;
+    const [device] = await db.select().from(devices).where(eq(devices.id, insertId));
     return device;
   }
 
   async updateDevice(id: number, data: Partial<InsertDevice>): Promise<Device | undefined> {
-    const [device] = await db.update(devices).set(data).where(eq(devices.id, id)).returning();
+    await db.update(devices).set(data).where(eq(devices.id, id));
+    const [device] = await db.select().from(devices).where(eq(devices.id, id));
     return device;
   }
 
@@ -140,7 +146,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent> {
-    const [event] = await db.insert(attendanceEvents).values(data).returning();
+    const result = await db.insert(attendanceEvents).values(data);
+    const insertId = result[0].insertId;
+    const [event] = await db.select().from(attendanceEvents).where(eq(attendanceEvents.id, insertId));
     return event;
   }
 
@@ -163,7 +171,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCommand(serial: string, commandId: string, command: string): Promise<DeviceCommand> {
-    const [cmd] = await db.insert(deviceCommands).values({ deviceSerial: serial, commandId, command }).returning();
+    const result = await db.insert(deviceCommands).values({ deviceSerial: serial, commandId, command });
+    const insertId = result[0].insertId;
+    const [cmd] = await db.select().from(deviceCommands).where(eq(deviceCommands.id, insertId));
     return cmd;
   }
 
@@ -184,10 +194,13 @@ export class DatabaseStorage implements IStorage {
   async saveForwardingConfig(data: InsertForwardingConfig): Promise<ForwardingConfig> {
     const existing = await this.getForwardingConfig();
     if (existing) {
-      const [updated] = await db.update(forwardingConfig).set(data).where(eq(forwardingConfig.id, existing.id)).returning();
+      await db.update(forwardingConfig).set(data).where(eq(forwardingConfig.id, existing.id));
+      const [updated] = await db.select().from(forwardingConfig).where(eq(forwardingConfig.id, existing.id));
       return updated;
     }
-    const [created] = await db.insert(forwardingConfig).values(data).returning();
+    const result = await db.insert(forwardingConfig).values(data);
+    const insertId = result[0].insertId;
+    const [created] = await db.select().from(forwardingConfig).where(eq(forwardingConfig.id, insertId));
     return created;
   }
 
