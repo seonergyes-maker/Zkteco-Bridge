@@ -6,7 +6,7 @@ Middleware application that receives push notifications from ZKTeco time clocks 
 ## Architecture
 - **Frontend**: React + TypeScript with Vite, Shadcn UI components, Wouter routing, TanStack Query
 - **Backend**: Express.js server implementing ZKTeco PUSH SDK 2.0.1 protocol
-- **Database**: PostgreSQL with Drizzle ORM
+- **Database**: MariaDB/MySQL with Drizzle ORM (via mysql2 driver, connection via MYSQL_DATABASE_URL secret)
 - **Language**: Spanish (UI labels and messages)
 
 ## Key Features
@@ -28,7 +28,7 @@ server/
   index.ts        - Express server setup
   routes.ts       - ZKTeco PUSH endpoints + REST API routes
   storage.ts      - Database storage layer (IStorage interface)
-  db.ts           - PostgreSQL connection with Drizzle
+  db.ts           - MySQL/MariaDB connection with Drizzle
   seed.ts         - Sample data seeding
 shared/
   schema.ts       - Drizzle schema + Zod validators + TypeScript types
