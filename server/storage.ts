@@ -25,7 +25,7 @@ export interface IStorage {
   updateDeviceStamps(serial: string, stamps: { attlogStamp?: string; operlogStamp?: string; attphotoStamp?: string }): Promise<void>;
   deleteDevice(id: number): Promise<void>;
 
-  getEvents(limit?: number): Promise<AttendanceEvent[]>;
+  getEvents(limit?: number, clientId?: number): Promise<AttendanceEvent[]>;
   getRecentEvents(limit?: number): Promise<AttendanceEvent[]>;
   getPendingEvents(): Promise<AttendanceEvent[]>;
   getPendingCount(): Promise<number>;
@@ -129,7 +129,18 @@ export class DatabaseStorage implements IStorage {
     await db.delete(devices).where(eq(devices.id, id));
   }
 
-  async getEvents(limit = 500): Promise<AttendanceEvent[]> {
+  async getEvents(limit = 500, clientId?: number): Promise<AttendanceEvent[]> {
+    if (clientId) {
+      const clientDevices = await db.select({ serialNumber: devices.serialNumber })
+        .from(devices)
+        .where(eq(devices.clientId, clientId));
+      const serials = clientDevices.map(d => d.serialNumber);
+      if (serials.length === 0) return [];
+      return db.select().from(attendanceEvents)
+        .where(sql`${attendanceEvents.deviceSerial} IN (${sql.join(serials.map(s => sql`${s}`), sql`, `)})`)
+        .orderBy(desc(attendanceEvents.receivedAt))
+        .limit(limit);
+    }
     return db.select().from(attendanceEvents).orderBy(desc(attendanceEvents.receivedAt)).limit(limit);
   }
 

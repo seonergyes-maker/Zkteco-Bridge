@@ -355,8 +355,9 @@ export async function registerRoutes(
   });
 
   // Events
-  app.get("/api/events", async (_req: Request, res: Response) => {
-    const list = await storage.getEvents();
+  app.get("/api/events", async (req: Request, res: Response) => {
+    const clientId = req.query.clientId ? parseInt(req.query.clientId as string, 10) : undefined;
+    const list = await storage.getEvents(500, clientId);
     res.json(list);
   });
 

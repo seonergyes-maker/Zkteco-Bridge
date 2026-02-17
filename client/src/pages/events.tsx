@@ -7,10 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarClock, Search, CheckCircle, Clock, Send, RefreshCw, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { CalendarClock, Search, CheckCircle, Clock, Send, RefreshCw, ArrowDownLeft, ArrowUpRight, Building2 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { ATTENDANCE_STATUS, VERIFY_MODE, type AttendanceEvent } from "@shared/schema";
+import { ATTENDANCE_STATUS, VERIFY_MODE, type AttendanceEvent, type Client, type Device } from "@shared/schema";
 import {
   Table,
   TableBody,
@@ -24,10 +24,25 @@ export default function Events() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [forwardFilter, setForwardFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const { toast } = useToast();
 
+  const { data: clientsList } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  const { data: devicesList } = useQuery<Device[]>({
+    queryKey: ["/api/devices"],
+  });
+
   const { data: events, isLoading } = useQuery<AttendanceEvent[]>({
-    queryKey: ["/api/events"],
+    queryKey: ["/api/events", clientFilter],
+    queryFn: async () => {
+      const url = clientFilter !== "all" ? `/api/events?clientId=${clientFilter}` : "/api/events";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Error al obtener eventos");
+      return res.json();
+    },
     refetchInterval: 10000,
   });
 
@@ -45,6 +60,13 @@ export default function Events() {
       toast({ title: "Error al reenviar", description: error.message, variant: "destructive" });
     },
   });
+
+  function getClientName(deviceSerial: string): string {
+    const device = devicesList?.find(d => d.serialNumber === deviceSerial);
+    if (!device) return "-";
+    const client = clientsList?.find(c => c.id === device.clientId);
+    return client?.name || "-";
+  }
 
   const filtered = events?.filter(e => {
     const matchSearch = search === "" ||
@@ -77,6 +99,18 @@ export default function Events() {
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
+        <Select value={clientFilter} onValueChange={setClientFilter}>
+          <SelectTrigger className="w-[200px]" data-testid="select-client-filter">
+            <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Empresa" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las empresas</SelectItem>
+            {clientsList?.map(c => (
+              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -112,7 +146,7 @@ export default function Events() {
             <SelectItem value="error">Con error</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="ghost" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/events"] })} data-testid="button-refresh-events">
+        <Button variant="ghost" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/events", clientFilter] })} data-testid="button-refresh-events">
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
@@ -126,6 +160,7 @@ export default function Events() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Empresa</TableHead>
                   <TableHead>PIN</TableHead>
                   <TableHead>Fecha / Hora</TableHead>
                   <TableHead>Estado</TableHead>
@@ -146,6 +181,7 @@ export default function Events() {
                           <ArrowUpRight className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                         )}
                       </TableCell>
+                      <TableCell className="text-sm font-medium">{getClientName(event.deviceSerial)}</TableCell>
                       <TableCell className="font-mono font-medium">{event.pin}</TableCell>
                       <TableCell className="text-sm">
                         {format(new Date(event.timestamp), "dd/MM/yyyy HH:mm:ss")}
