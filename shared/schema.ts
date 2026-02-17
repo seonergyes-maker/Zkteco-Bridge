@@ -1,75 +1,75 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, serial } from "drizzle-orm/pg-core";
+import { mysqlTable, text, varchar, int, datetime, boolean, serial } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const clients = pgTable("clients", {
+export const clients = mysqlTable("clients", {
   id: serial("id").primaryKey(),
-  clientId: text("client_id").notNull().unique(),
+  clientId: text("client_id").notNull(),
   name: text("name").notNull(),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
 });
 
-export const devices = pgTable("devices", {
+export const devices = mysqlTable("devices", {
   id: serial("id").primaryKey(),
-  serialNumber: text("serial_number").notNull().unique(),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  serialNumber: varchar("serial_number", { length: 255 }).notNull().unique(),
+  clientId: int("client_id").references(() => clients.id).notNull(),
   alias: text("alias"),
   model: text("model"),
   firmwareVersion: text("firmware_version"),
   ipAddress: text("ip_address"),
-  lastSeen: timestamp("last_seen"),
+  lastSeen: datetime("last_seen"),
   active: boolean("active").notNull().default(true),
   attlogStamp: text("attlog_stamp").default("0"),
   operlogStamp: text("operlog_stamp").default("0"),
   attphotoStamp: text("attphoto_stamp").default("0"),
 });
 
-export const attendanceEvents = pgTable("attendance_events", {
+export const attendanceEvents = mysqlTable("attendance_events", {
   id: serial("id").primaryKey(),
-  deviceSerial: text("device_serial").notNull(),
-  pin: text("pin").notNull(),
-  timestamp: timestamp("timestamp").notNull(),
-  status: integer("status").notNull().default(0),
-  verify: integer("verify").notNull().default(0),
+  deviceSerial: varchar("device_serial", { length: 255 }).notNull(),
+  pin: varchar("pin", { length: 255 }).notNull(),
+  timestamp: datetime("timestamp").notNull(),
+  status: int("status").notNull().default(0),
+  verify: int("verify").notNull().default(0),
   workCode: text("work_code"),
   forwarded: boolean("forwarded").notNull().default(false),
-  forwardedAt: timestamp("forwarded_at"),
+  forwardedAt: datetime("forwarded_at"),
   forwardError: text("forward_error"),
   rawData: text("raw_data"),
-  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  receivedAt: datetime("received_at").default(sql`NOW()`).notNull(),
 });
 
-export const operationLogs = pgTable("operation_logs", {
+export const operationLogs = mysqlTable("operation_logs", {
   id: serial("id").primaryKey(),
-  deviceSerial: text("device_serial").notNull(),
-  logType: text("log_type").notNull(),
+  deviceSerial: varchar("device_serial", { length: 255 }).notNull(),
+  logType: varchar("log_type", { length: 255 }).notNull(),
   content: text("content").notNull(),
-  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  receivedAt: datetime("received_at").default(sql`NOW()`).notNull(),
 });
 
-export const deviceCommands = pgTable("device_commands", {
+export const deviceCommands = mysqlTable("device_commands", {
   id: serial("id").primaryKey(),
-  deviceSerial: text("device_serial").notNull(),
-  commandId: text("command_id").notNull(),
+  deviceSerial: varchar("device_serial", { length: 255 }).notNull(),
+  commandId: varchar("command_id", { length: 255 }).notNull(),
   command: text("command").notNull(),
-  status: text("status").notNull().default("pending"),
+  status: varchar("status", { length: 50 }).notNull().default("pending"),
   returnValue: text("return_value"),
   returnData: text("return_data"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  executedAt: timestamp("executed_at"),
+  createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
+  executedAt: datetime("executed_at"),
 });
 
-export const forwardingConfig = pgTable("forwarding_config", {
+export const forwardingConfig = mysqlTable("forwarding_config", {
   id: serial("id").primaryKey(),
   oracleApiUrl: text("oracle_api_url").notNull(),
   oracleApiKey: text("oracle_api_key"),
   enabled: boolean("enabled").notNull().default(false),
-  retryAttempts: integer("retry_attempts").notNull().default(3),
-  retryDelayMs: integer("retry_delay_ms").notNull().default(5000),
+  retryAttempts: int("retry_attempts").notNull().default(3),
+  retryDelayMs: int("retry_delay_ms").notNull().default(5000),
 });
 
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
