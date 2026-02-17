@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertClientSchema, insertDeviceSchema, insertForwardingConfigSchema } from "@shared/schema";
 import { log } from "./index";
+import { insertFichaje, testMariaDbConnection, ensureFichajesTable, getMariaDbStatus } from "./mariadb";
 
 function parseZktecoTimestamp(timeStr: string): Date | null {
   const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
@@ -22,36 +23,21 @@ async function forwardEvent(event: any) {
 
   for (let attempt = 0; attempt < config.retryAttempts; attempt++) {
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (config.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${config.oracleApiKey}`;
-      }
-
       const device = await storage.getDeviceBySerial(event.deviceSerial);
+      const client = device ? await storage.getClient(device.clientId) : null;
 
-      const response = await fetch(config.oracleApiUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          deviceSerial: event.deviceSerial,
-          clientId: device?.clientId,
-          pin: event.pin,
-          timestamp: event.timestamp,
-          status: event.status,
-          verify: event.verify,
-          workCode: event.workCode,
-        }),
+      await insertFichaje({
+        deviceSerial: event.deviceSerial,
+        clientId: client?.clientId || null,
+        pin: event.pin,
+        timestamp: event.timestamp,
+        status: event.status,
+        verify: event.verify,
+        workCode: event.workCode,
       });
 
-      if (response.ok) {
-        await storage.markEventForwarded(event.id);
-        return;
-      }
-
-      const errorText = await response.text();
-      if (attempt === config.retryAttempts - 1) {
-        await storage.markEventForwardError(event.id, `HTTP ${response.status}: ${errorText}`);
-      }
+      await storage.markEventForwarded(event.id);
+      return;
     } catch (err: any) {
       if (attempt === config.retryAttempts - 1) {
         await storage.markEventForwardError(event.id, err.message);
@@ -401,30 +387,16 @@ export async function registerRoutes(
   });
 
   app.post("/api/forwarding-config/test", async (_req: Request, res: Response) => {
-    const config = await storage.getForwardingConfig();
-    if (!config) {
-      res.json({ success: false, error: "No hay configuracion de reenvio" });
-      return;
+    const result = await testMariaDbConnection();
+    if (result.success) {
+      await ensureFichajesTable();
     }
-    try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (config.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${config.oracleApiKey}`;
-      }
-      const response = await fetch(config.oracleApiUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
-      });
-      if (response.ok) {
-        res.json({ success: true });
-      } else {
-        const text = await response.text();
-        res.json({ success: false, error: `HTTP ${response.status}: ${text.substring(0, 200)}` });
-      }
-    } catch (err: any) {
-      res.json({ success: false, error: err.message });
-    }
+    res.json(result);
+  });
+
+  app.get("/api/mariadb/status", async (_req: Request, res: Response) => {
+    const status = await getMariaDbStatus();
+    res.json(status);
   });
 
   return httpServer;
