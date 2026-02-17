@@ -15,13 +15,14 @@ Middleware application that receives push notifications from ZKTeco time clocks 
 - Device management with real-time online/offline status
 - Attendance event reception and storage
 - Automatic event forwarding to Oracle API with retry logic
+- Device command system (REBOOT, INFO, CHECK, LOG, CLEAR LOG, SET OPTION, QUERY ATTLOG, DATA USER, DATA DEL_USER, AC_UNLOCK)
 - Dashboard with real-time statistics
 - Dark/Light theme support
 
 ## Project Structure
 ```
 client/src/
-  pages/          - Dashboard, Clients, Devices, Events, Settings
+  pages/          - Dashboard, Clients, Devices, Events, Commands, Settings
   components/     - AppSidebar, ThemeProvider, ThemeToggle, UI components
   lib/            - queryClient (TanStack Query setup)
 server/
@@ -49,6 +50,7 @@ shared/
 - `/api/events/recent` - Latest 20 events
 - `/api/events/pending-count` - Count of unforwarded events
 - `/api/events/retry-forward` - Retry forwarding pending events
+- `/api/commands` - GET (list command history), POST (send command to device)
 - `/api/forwarding-config` - Oracle forwarding configuration
 
 ## Database Tables

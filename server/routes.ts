@@ -400,6 +400,99 @@ export async function registerRoutes(
     res.json(config);
   });
 
+  // Commands API
+  app.get("/api/commands", async (req: Request, res: Response) => {
+    const serial = req.query.serial as string | undefined;
+    const commands = await storage.getCommandHistory(serial);
+    res.json(commands);
+  });
+
+  app.post("/api/commands", async (req: Request, res: Response) => {
+    const { deviceSerial, commandType, params } = req.body;
+
+    if (!deviceSerial || !commandType) {
+      res.status(400).json({ message: "Falta el dispositivo o tipo de comando" });
+      return;
+    }
+
+    const device = await storage.getDeviceBySerial(deviceSerial);
+    if (!device) {
+      res.status(404).json({ message: "Dispositivo no encontrado" });
+      return;
+    }
+
+    let commandStr = "";
+    const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    switch (commandType) {
+      case "REBOOT":
+        commandStr = "REBOOT";
+        break;
+      case "INFO":
+        commandStr = "INFO";
+        break;
+      case "CHECK":
+        commandStr = "CHECK";
+        break;
+      case "LOG":
+        commandStr = "LOG";
+        break;
+      case "CLEAR_LOG":
+        commandStr = "CLEAR LOG";
+        break;
+      case "SET_OPTION":
+        if (!params?.item || params?.value === undefined) {
+          res.status(400).json({ message: "Falta ITEM o VALUE para SET OPTION" });
+          return;
+        }
+        commandStr = `SET OPTION ${params.item}=${params.value}`;
+        break;
+      case "QUERY_ATTLOG":
+        if (!params?.startTime || !params?.endTime) {
+          res.status(400).json({ message: "Falta StartTime o EndTime para QUERY ATTLOG" });
+          return;
+        }
+        commandStr = `QUERY ATTLOG StartTime=${params.startTime}\tEndTime=${params.endTime}`;
+        break;
+      case "DATA_USER":
+        if (!params?.pin) {
+          res.status(400).json({ message: "Falta PIN para DATA USER" });
+          return;
+        }
+        {
+          const parts = [`PIN=${params.pin}`];
+          if (params.name) parts.push(`Name=${params.name}`);
+          if (params.password) parts.push(`Passwd=${params.password}`);
+          if (params.card) parts.push(`Card=${params.card}`);
+          if (params.privilege !== undefined) parts.push(`Pri=${params.privilege}`);
+          if (params.group !== undefined) parts.push(`Grp=${params.group}`);
+          commandStr = `DATA USER ${parts.join("\t")}`;
+        }
+        break;
+      case "DATA_DEL_USER":
+        if (!params?.pin) {
+          res.status(400).json({ message: "Falta PIN para DATA DEL_USER" });
+          return;
+        }
+        commandStr = `DATA DEL_USER PIN=${params.pin}`;
+        break;
+      case "AC_UNLOCK":
+        commandStr = "AC_UNLOCK";
+        break;
+      default:
+        res.status(400).json({ message: `Tipo de comando desconocido: ${commandType}` });
+        return;
+    }
+
+    try {
+      const cmd = await storage.createCommand(deviceSerial, cmdId, commandStr);
+      log(`[CMD] Command ${commandType} queued for ${deviceSerial}: ${commandStr}`, "commands");
+      res.json(cmd);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/forwarding-config/test", async (_req: Request, res: Response) => {
     const config = await storage.getForwardingConfig();
     if (!config) {

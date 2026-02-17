@@ -13,6 +13,7 @@ import Clients from "@/pages/clients";
 import Devices from "@/pages/devices";
 import Events from "@/pages/events";
 import SettingsPage from "@/pages/settings";
+import Commands from "@/pages/commands";
 
 function Router() {
   return (
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/clients" component={Clients} />
       <Route path="/devices" component={Devices} />
       <Route path="/events" component={Events} />
+      <Route path="/commands" component={Commands} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>

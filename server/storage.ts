@@ -36,6 +36,7 @@ export interface IStorage {
   createOperationLog(deviceSerial: string, logType: string, content: string): Promise<void>;
 
   getPendingCommands(serial: string): Promise<DeviceCommand[]>;
+  getCommandHistory(serial?: string, limit?: number): Promise<DeviceCommand[]>;
   createCommand(serial: string, commandId: string, command: string): Promise<DeviceCommand>;
   updateCommandResult(commandId: string, returnValue: string, returnData?: string): Promise<void>;
 
@@ -168,6 +169,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(deviceCommands).where(
       and(eq(deviceCommands.deviceSerial, serial), eq(deviceCommands.status, "pending"))
     ).orderBy(deviceCommands.createdAt);
+  }
+
+  async getCommandHistory(serial?: string, limit = 100): Promise<DeviceCommand[]> {
+    if (serial) {
+      return db.select().from(deviceCommands)
+        .where(eq(deviceCommands.deviceSerial, serial))
+        .orderBy(desc(deviceCommands.createdAt))
+        .limit(limit);
+    }
+    return db.select().from(deviceCommands)
+      .orderBy(desc(deviceCommands.createdAt))
+      .limit(limit);
   }
 
   async createCommand(serial: string, commandId: string, command: string): Promise<DeviceCommand> {
