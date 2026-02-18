@@ -51,6 +51,7 @@ export interface IStorage {
   deleteDeviceUser(id: number): Promise<void>;
   upsertDeviceUsers(clientId: number, users: InsertDeviceUser[]): Promise<{ created: number; updated: number }>;
   updateDeviceUserSyncStatus(id: number, deviceSerial: string): Promise<void>;
+  getUnsyncedUsersForDevice(clientId: number, deviceSerial: string): Promise<DeviceUser[]>;
   clearDeviceUsers(clientId: number): Promise<void>;
 
   getScheduledTasks(): Promise<ScheduledTask[]>;
@@ -299,6 +300,17 @@ export class DatabaseStorage implements IStorage {
       synced.push(deviceSerial);
     }
     await db.update(deviceUsers).set({ syncedToDevices: JSON.stringify(synced), updatedAt: new Date() }).where(eq(deviceUsers.id, id));
+  }
+
+  async getUnsyncedUsersForDevice(clientId: number, deviceSerial: string): Promise<DeviceUser[]> {
+    const allUsers = await db.select().from(deviceUsers).where(eq(deviceUsers.clientId, clientId));
+    return allUsers.filter(u => {
+      if (!u.syncedToDevices) return true;
+      try {
+        const synced: string[] = JSON.parse(u.syncedToDevices);
+        return !synced.includes(deviceSerial);
+      } catch { return true; }
+    });
   }
 
   async clearDeviceUsers(clientId: number): Promise<void> {

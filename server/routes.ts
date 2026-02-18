@@ -444,6 +444,29 @@ export async function registerRoutes(
 
     addProtocolLog("IN", sn, "/iclock/getrequest", "GET", `Polling de comandos`, `Query: SN=${sn}`, ip);
 
+    const device = await storage.getDeviceBySerial(sn);
+    if (device) {
+      try {
+        const unsyncedUsers = await storage.getUnsyncedUsersForDevice(device.clientId, sn);
+        if (unsyncedUsers.length > 0) {
+          for (const user of unsyncedUsers) {
+            const parts = [`PIN=${user.pin}`];
+            if (user.name) parts.push(`Name=${user.name}`);
+            if (user.password) parts.push(`Passwd=${user.password}`);
+            if (user.card) parts.push(`Card=${user.card}`);
+            parts.push(`Pri=${user.privilege}`);
+            const commandStr = `DATA USER ${parts.join("\t")}`;
+            const cmdId = `AUTOSYNC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+            await storage.createCommand(sn, cmdId, commandStr);
+            await storage.updateDeviceUserSyncStatus(user.id, sn);
+          }
+          log(`[AUTOSYNC] ${unsyncedUsers.length} usuario(s) auto-sincronizado(s) al dispositivo ${sn}`, "users");
+        }
+      } catch (err: any) {
+        log(`[AUTOSYNC] Error auto-sincronizando usuarios: ${err.message}`, "error");
+      }
+    }
+
     const commands = await storage.getPendingCommands(sn);
 
     if (commands.length === 0) {
