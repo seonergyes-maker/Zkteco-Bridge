@@ -263,6 +263,7 @@ export default function Tasks() {
   }
 
   function getDeviceAlias(serial: string) {
+    if (serial === "__ALL__") return "Todos los dispositivos";
     const device = devices?.find(d => d.serialNumber === serial);
     if (!device) return serial;
     return deviceLabel(device);
@@ -345,6 +346,7 @@ export default function Tasks() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="__ALL__">Todos los dispositivos</SelectItem>
                         {devices?.map((device) => (
                           <SelectItem key={device.id} value={device.serialNumber}>
                             {deviceLabel(device)}

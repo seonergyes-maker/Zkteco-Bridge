@@ -1012,9 +1012,21 @@ export async function registerRoutes(
             continue;
           }
 
-          const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-          await storage.createCommand(task.deviceSerial, cmdId, commandStr);
-          log(`[Scheduler] Task "${task.name}" executed: ${commandStr} -> ${task.deviceSerial}`, "scheduler");
+          const targetSerials: string[] = [];
+          if (task.deviceSerial === "__ALL__") {
+            const allDevices = await storage.getDevices();
+            for (const dev of allDevices) {
+              targetSerials.push(dev.serialNumber);
+            }
+          } else {
+            targetSerials.push(task.deviceSerial);
+          }
+
+          for (const serial of targetSerials) {
+            const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+            await storage.createCommand(serial, cmdId, commandStr);
+            log(`[Scheduler] Task "${task.name}" executed: ${commandStr} -> ${serial}`, "scheduler");
+          }
 
           const nextRunAt = task.scheduleType === "one_time" ? null : computeNextRunAt(task, now);
           await storage.markScheduledTaskRun(task.id, now, nextRunAt);
