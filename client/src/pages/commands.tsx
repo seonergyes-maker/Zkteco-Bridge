@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import type { Device, DeviceCommand } from "@shared/schema";
+import type { Device, DeviceCommand, Client } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -123,6 +123,17 @@ export default function Commands() {
   const { data: devices, isLoading: devicesLoading } = useQuery<Device[]>({
     queryKey: ["/api/devices"],
   });
+
+  const { data: clientsList } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  function deviceLabel(d: Device): string {
+    const client = clientsList?.find(c => c.id === d.clientId);
+    const clientName = client?.name || "";
+    const alias = d.alias || d.serialNumber;
+    return clientName ? `${clientName} - ${alias} (${d.serialNumber})` : `${alias} (${d.serialNumber})`;
+  }
 
   const { data: commands, isLoading: commandsLoading } = useQuery<DeviceCommand[]>({
     queryKey: ["/api/commands", filterDevice],
@@ -441,7 +452,7 @@ export default function Commands() {
                   <SelectContent>
                     {devices?.map((d) => (
                       <SelectItem key={d.serialNumber} value={d.serialNumber}>
-                        {d.alias || d.serialNumber} ({d.serialNumber})
+                        {deviceLabel(d)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -952,7 +963,7 @@ export default function Commands() {
                   <SelectContent>
                     {devices?.map((d) => (
                       <SelectItem key={d.serialNumber} value={d.serialNumber}>
-                        {d.alias || d.serialNumber} ({d.serialNumber})
+                        {deviceLabel(d)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1004,7 +1015,7 @@ export default function Commands() {
                     <SelectItem value="all">Todos los dispositivos</SelectItem>
                     {devices?.map((d) => (
                       <SelectItem key={d.serialNumber} value={d.serialNumber}>
-                        {d.alias || d.serialNumber}
+                        {deviceLabel(d)}
                       </SelectItem>
                     ))}
                   </SelectContent>
