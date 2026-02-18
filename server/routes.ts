@@ -1,9 +1,98 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertClientSchema, insertDeviceSchema } from "@shared/schema";
+import { insertClientSchema, insertDeviceSchema, insertScheduledTaskSchema } from "@shared/schema";
 import { log } from "./index";
 import { encrypt, decrypt, maskApiKey, isEncrypted } from "./crypto";
+
+function buildCommandString(commandType: string, params?: any): string | null {
+  switch (commandType) {
+    case "REBOOT": return "REBOOT";
+    case "INFO": return "INFO";
+    case "CHECK": return "CHECK";
+    case "LOG": return "LOG";
+    case "CLEAR_LOG": return "CLEAR LOG";
+    case "SET_OPTION":
+      if (!params?.item || params?.value === undefined) return null;
+      return `SET OPTION ${params.item}=${params.value}`;
+    case "QUERY_ATTLOG":
+      if (!params?.startTime || !params?.endTime) return null;
+      return `QUERY ATTLOG StartTime=${params.startTime}\tEndTime=${params.endTime}`;
+    case "DATA_USER":
+      if (!params?.pin) return null;
+      {
+        const parts = [`PIN=${params.pin}`];
+        if (params.name) parts.push(`Name=${params.name}`);
+        if (params.password) parts.push(`Passwd=${params.password}`);
+        if (params.card) parts.push(`Card=${params.card}`);
+        if (params.privilege !== undefined) parts.push(`Pri=${params.privilege}`);
+        if (params.group !== undefined) parts.push(`Grp=${params.group}`);
+        return `DATA USER ${parts.join("\t")}`;
+      }
+    case "DATA_DEL_USER":
+      if (!params?.pin) return null;
+      return `DATA DEL_USER PIN=${params.pin}`;
+    case "AC_UNLOCK": return "AC_UNLOCK";
+    default: return null;
+  }
+}
+
+function computeNextRunAt(task: { scheduleType: string; runAt?: Date | null; intervalMinutes?: number | null; daysOfWeek?: string | null; timeOfDay?: string | null }, fromDate?: Date): Date | null {
+  const now = fromDate || new Date();
+
+  if (task.scheduleType === "one_time") {
+    return task.runAt ? new Date(task.runAt) : null;
+  }
+
+  if (task.scheduleType === "interval" && task.intervalMinutes) {
+    return new Date(now.getTime() + task.intervalMinutes * 60 * 1000);
+  }
+
+  if (task.scheduleType === "daily" && task.timeOfDay) {
+    const [hours, minutes] = task.timeOfDay.split(":").map(Number);
+    const next = new Date(now);
+    next.setHours(hours, minutes, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    return next;
+  }
+
+  if (task.scheduleType === "weekly" && task.timeOfDay && task.daysOfWeek) {
+    const [hours, minutes] = task.timeOfDay.split(":").map(Number);
+    const days = task.daysOfWeek.split(",").map(Number);
+    if (days.length === 0) return null;
+
+    for (let offset = 0; offset <= 7; offset++) {
+      const candidate = new Date(now);
+      candidate.setDate(candidate.getDate() + offset);
+      candidate.setHours(hours, minutes, 0, 0);
+      if (candidate > now && days.includes(candidate.getDay())) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  return null;
+}
+
+function validateScheduleFields(data: { scheduleType: string; runAt?: Date | null; intervalMinutes?: number | null; timeOfDay?: string | null; daysOfWeek?: string | null }): string | null {
+  switch (data.scheduleType) {
+    case "one_time":
+      if (!data.runAt) return "Falta la fecha/hora de ejecucion para tarea unica";
+      break;
+    case "interval":
+      if (!data.intervalMinutes || data.intervalMinutes < 1) return "Falta o invalido el intervalo en minutos";
+      break;
+    case "daily":
+      if (!data.timeOfDay) return "Falta la hora para tarea diaria";
+      break;
+    case "weekly":
+      if (!data.timeOfDay) return "Falta la hora para tarea semanal";
+      if (!data.daysOfWeek) return "Falta seleccionar los dias de la semana";
+      break;
+  }
+  return null;
+}
 
 function parseZktecoTimestamp(timeStr: string): Date | null {
   const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
@@ -476,68 +565,13 @@ export async function registerRoutes(
       return;
     }
 
-    let commandStr = "";
-    const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-
-    switch (commandType) {
-      case "REBOOT":
-        commandStr = "REBOOT";
-        break;
-      case "INFO":
-        commandStr = "INFO";
-        break;
-      case "CHECK":
-        commandStr = "CHECK";
-        break;
-      case "LOG":
-        commandStr = "LOG";
-        break;
-      case "CLEAR_LOG":
-        commandStr = "CLEAR LOG";
-        break;
-      case "SET_OPTION":
-        if (!params?.item || params?.value === undefined) {
-          res.status(400).json({ message: "Falta ITEM o VALUE para SET OPTION" });
-          return;
-        }
-        commandStr = `SET OPTION ${params.item}=${params.value}`;
-        break;
-      case "QUERY_ATTLOG":
-        if (!params?.startTime || !params?.endTime) {
-          res.status(400).json({ message: "Falta StartTime o EndTime para QUERY ATTLOG" });
-          return;
-        }
-        commandStr = `QUERY ATTLOG StartTime=${params.startTime}\tEndTime=${params.endTime}`;
-        break;
-      case "DATA_USER":
-        if (!params?.pin) {
-          res.status(400).json({ message: "Falta PIN para DATA USER" });
-          return;
-        }
-        {
-          const parts = [`PIN=${params.pin}`];
-          if (params.name) parts.push(`Name=${params.name}`);
-          if (params.password) parts.push(`Passwd=${params.password}`);
-          if (params.card) parts.push(`Card=${params.card}`);
-          if (params.privilege !== undefined) parts.push(`Pri=${params.privilege}`);
-          if (params.group !== undefined) parts.push(`Grp=${params.group}`);
-          commandStr = `DATA USER ${parts.join("\t")}`;
-        }
-        break;
-      case "DATA_DEL_USER":
-        if (!params?.pin) {
-          res.status(400).json({ message: "Falta PIN para DATA DEL_USER" });
-          return;
-        }
-        commandStr = `DATA DEL_USER PIN=${params.pin}`;
-        break;
-      case "AC_UNLOCK":
-        commandStr = "AC_UNLOCK";
-        break;
-      default:
-        res.status(400).json({ message: `Tipo de comando desconocido: ${commandType}` });
-        return;
+    const commandStr = buildCommandString(commandType, params);
+    if (!commandStr) {
+      res.status(400).json({ message: `Parametros invalidos para el comando ${commandType}` });
+      return;
     }
+
+    const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     try {
       const cmd = await storage.createCommand(deviceSerial, cmdId, commandStr);
@@ -547,6 +581,96 @@ export async function registerRoutes(
       res.status(500).json({ message: err.message });
     }
   });
+
+  // Scheduled Tasks API
+  app.get("/api/tasks", async (_req: Request, res: Response) => {
+    const tasks = await storage.getScheduledTasks();
+    res.json(tasks);
+  });
+
+  app.post("/api/tasks", async (req: Request, res: Response) => {
+    const parsed = insertScheduledTaskSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: parsed.error.message });
+      return;
+    }
+    const data = parsed.data;
+    const scheduleError = validateScheduleFields(data);
+    if (scheduleError) {
+      res.status(400).json({ message: scheduleError });
+      return;
+    }
+    if (data.commandParams) {
+      try { JSON.parse(data.commandParams); } catch { res.status(400).json({ message: "commandParams debe ser JSON valido" }); return; }
+    }
+    try {
+      const nextRunAt = computeNextRunAt(data);
+      const task = await storage.createScheduledTask({ ...data, nextRunAt });
+      res.json(task);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/tasks/:id", async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const existing = await storage.getScheduledTask(id);
+    if (!existing) {
+      res.status(404).json({ message: "Tarea no encontrada" });
+      return;
+    }
+    const partial = insertScheduledTaskSchema.partial().safeParse(req.body);
+    if (!partial.success) {
+      res.status(400).json({ message: partial.error.message });
+      return;
+    }
+    const updateData: any = { ...partial.data };
+    if (updateData.commandParams) {
+      try { JSON.parse(updateData.commandParams); } catch { res.status(400).json({ message: "commandParams debe ser JSON valido" }); return; }
+    }
+    const merged = { ...existing, ...updateData };
+    if (updateData.scheduleType || updateData.runAt || updateData.intervalMinutes || updateData.timeOfDay || updateData.daysOfWeek) {
+      updateData.nextRunAt = computeNextRunAt(merged);
+    }
+    const task = await storage.updateScheduledTask(id, updateData);
+    res.json(task);
+  });
+
+  app.delete("/api/tasks/:id", async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    await storage.deleteScheduledTask(id);
+    res.json({ success: true });
+  });
+
+  // Scheduler: check for due tasks every 30 seconds
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const dueTasks = await storage.getDueScheduledTasks(now);
+
+      for (const task of dueTasks) {
+        try {
+          const params = task.commandParams ? JSON.parse(task.commandParams) : undefined;
+          const commandStr = buildCommandString(task.commandType, params);
+          if (!commandStr) {
+            log(`[Scheduler] Invalid command for task "${task.name}": ${task.commandType}`, "scheduler");
+            continue;
+          }
+
+          const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          await storage.createCommand(task.deviceSerial, cmdId, commandStr);
+          log(`[Scheduler] Task "${task.name}" executed: ${commandStr} -> ${task.deviceSerial}`, "scheduler");
+
+          const nextRunAt = task.scheduleType === "one_time" ? null : computeNextRunAt(task, now);
+          await storage.markScheduledTaskRun(task.id, now, nextRunAt);
+        } catch (err: any) {
+          log(`[Scheduler] Error executing task "${task.name}": ${err.message}`, "scheduler");
+        }
+      }
+    } catch (err: any) {
+      log(`[Scheduler] Error checking due tasks: ${err.message}`, "scheduler");
+    }
+  }, 30000);
 
   return httpServer;
 }

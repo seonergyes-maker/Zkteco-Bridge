@@ -1,8 +1,34 @@
 import { storage } from "./storage";
 import { log } from "./index";
+import { pool } from "./db";
+
+async function ensureTables() {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query(`CREATE TABLE IF NOT EXISTS scheduled_tasks (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name TEXT NOT NULL,
+      device_serial VARCHAR(255) NOT NULL,
+      command_type VARCHAR(50) NOT NULL,
+      command_params TEXT,
+      schedule_type VARCHAR(20) NOT NULL,
+      run_at DATETIME,
+      interval_minutes INT,
+      days_of_week TEXT,
+      time_of_day VARCHAR(5),
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      last_run_at DATETIME,
+      next_run_at DATETIME,
+      created_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
+  } finally {
+    conn.release();
+  }
+}
 
 export async function seedDatabase() {
   try {
+    await ensureTables();
     const existingClients = await storage.getClients();
     if (existingClients.length > 0) {
       log("Database already has data, skipping seed", "seed");

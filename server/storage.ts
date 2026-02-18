@@ -1,11 +1,12 @@
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 import {
-  clients, devices, attendanceEvents, operationLogs, deviceCommands,
+  clients, devices, attendanceEvents, operationLogs, deviceCommands, scheduledTasks,
   type Client, type InsertClient,
   type Device, type InsertDevice,
   type AttendanceEvent, type InsertAttendanceEvent,
   type DeviceCommand,
+  type ScheduledTask, type InsertScheduledTask,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -39,6 +40,14 @@ export interface IStorage {
   getCommandHistory(serial?: string, limit?: number): Promise<DeviceCommand[]>;
   createCommand(serial: string, commandId: string, command: string): Promise<DeviceCommand>;
   updateCommandResult(commandId: string, returnValue: string, returnData?: string): Promise<void>;
+
+  getScheduledTasks(): Promise<ScheduledTask[]>;
+  getScheduledTask(id: number): Promise<ScheduledTask | undefined>;
+  createScheduledTask(data: InsertScheduledTask & { nextRunAt?: Date | null }): Promise<ScheduledTask>;
+  updateScheduledTask(id: number, data: Partial<InsertScheduledTask & { nextRunAt?: Date | null }>): Promise<ScheduledTask | undefined>;
+  deleteScheduledTask(id: number): Promise<void>;
+  getDueScheduledTasks(now: Date): Promise<ScheduledTask[]>;
+  markScheduledTaskRun(id: number, lastRunAt: Date, nextRunAt: Date | null): Promise<void>;
 
   getDashboardStats(): Promise<{
     totalClients: number;
@@ -235,6 +244,52 @@ export class DatabaseStorage implements IStorage {
       pendingForward: pendingCount?.count || 0,
       forwardedToday: forwardedCount?.count || 0,
     };
+  }
+
+  async getScheduledTasks(): Promise<ScheduledTask[]> {
+    return db.select().from(scheduledTasks).orderBy(desc(scheduledTasks.createdAt));
+  }
+
+  async getScheduledTask(id: number): Promise<ScheduledTask | undefined> {
+    const [task] = await db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id));
+    return task;
+  }
+
+  async createScheduledTask(data: InsertScheduledTask & { nextRunAt?: Date | null }): Promise<ScheduledTask> {
+    const result = await db.insert(scheduledTasks).values(data);
+    const insertId = result[0].insertId;
+    const [task] = await db.select().from(scheduledTasks).where(eq(scheduledTasks.id, insertId));
+    return task;
+  }
+
+  async updateScheduledTask(id: number, data: Partial<InsertScheduledTask & { nextRunAt?: Date | null }>): Promise<ScheduledTask | undefined> {
+    await db.update(scheduledTasks).set(data).where(eq(scheduledTasks.id, id));
+    const [task] = await db.select().from(scheduledTasks).where(eq(scheduledTasks.id, id));
+    return task;
+  }
+
+  async deleteScheduledTask(id: number): Promise<void> {
+    await db.delete(scheduledTasks).where(eq(scheduledTasks.id, id));
+  }
+
+  async getDueScheduledTasks(now: Date): Promise<ScheduledTask[]> {
+    return db.select().from(scheduledTasks).where(
+      and(
+        eq(scheduledTasks.enabled, true),
+        sql`${scheduledTasks.nextRunAt} <= ${now}`
+      )
+    );
+  }
+
+  async markScheduledTaskRun(id: number, lastRunAt: Date, nextRunAt: Date | null): Promise<void> {
+    const data: any = { lastRunAt };
+    if (nextRunAt) {
+      data.nextRunAt = nextRunAt;
+    } else {
+      data.nextRunAt = null;
+      data.enabled = false;
+    }
+    await db.update(scheduledTasks).set(data).where(eq(scheduledTasks.id, id));
   }
 }
 

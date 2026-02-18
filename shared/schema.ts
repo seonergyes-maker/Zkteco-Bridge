@@ -68,9 +68,34 @@ export const deviceCommands = mysqlTable("device_commands", {
   executedAt: datetime("executed_at"),
 });
 
+export const scheduledTasks = mysqlTable("scheduled_tasks", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  deviceSerial: varchar("device_serial", { length: 255 }).notNull(),
+  commandType: varchar("command_type", { length: 50 }).notNull(),
+  commandParams: text("command_params"),
+  scheduleType: varchar("schedule_type", { length: 20 }).notNull(),
+  runAt: datetime("run_at"),
+  intervalMinutes: int("interval_minutes"),
+  daysOfWeek: text("days_of_week"),
+  timeOfDay: varchar("time_of_day", { length: 5 }),
+  enabled: boolean("enabled").notNull().default(true),
+  lastRunAt: datetime("last_run_at"),
+  nextRunAt: datetime("next_run_at"),
+  createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
 export const insertDeviceSchema = createInsertSchema(devices).omit({ id: true, lastSeen: true, attlogStamp: true, operlogStamp: true, attphotoStamp: true });
 export const insertAttendanceEventSchema = createInsertSchema(attendanceEvents).omit({ id: true, receivedAt: true });
+export const insertScheduledTaskSchema = createInsertSchema(scheduledTasks).omit({ id: true, createdAt: true, lastRunAt: true, nextRunAt: true }).extend({
+  runAt: z.preprocess((val) => {
+    if (!val) return undefined;
+    if (val instanceof Date) return val;
+    if (typeof val === "string") return new Date(val);
+    return undefined;
+  }, z.date().optional()),
+});
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -80,6 +105,8 @@ export type AttendanceEvent = typeof attendanceEvents.$inferSelect;
 export type InsertAttendanceEvent = z.infer<typeof insertAttendanceEventSchema>;
 export type OperationLog = typeof operationLogs.$inferSelect;
 export type DeviceCommand = typeof deviceCommands.$inferSelect;
+export type ScheduledTask = typeof scheduledTasks.$inferSelect;
+export type InsertScheduledTask = z.infer<typeof insertScheduledTaskSchema>;
 
 export const ATTENDANCE_STATUS: Record<number, string> = {
   0: "Entrada",

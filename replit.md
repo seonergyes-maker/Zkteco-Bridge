@@ -22,7 +22,7 @@ Middleware application that receives push notifications from ZKTeco time clocks 
 ## Project Structure
 ```
 client/src/
-  pages/          - Dashboard, Clients, Devices, Events, Commands, Settings
+  pages/          - Dashboard, Clients, Devices, Events, Commands, Tasks, Settings
   components/     - AppSidebar, ThemeProvider, ThemeToggle, UI components
   lib/            - queryClient (TanStack Query setup)
 server/
@@ -52,6 +52,7 @@ shared/
 - `/api/events/retry-forward` - Retry forwarding pending events
 - `/api/commands` - GET (list command history), POST (send command to device)
 - `/api/clients/:id/test-forwarding` - Test Oracle connection for specific client
+- `/api/tasks` - GET (list scheduled tasks), POST (create), PATCH /:id (update), DELETE /:id
 
 ## Database Tables
 - `clients` - Client registry with custom IDs, per-client Oracle forwarding config
@@ -59,3 +60,4 @@ shared/
 - `attendance_events` - All attendance records with forwarding status
 - `operation_logs` - Device operation logs
 - `device_commands` - Pending/executed device commands
+- `scheduled_tasks` - Scheduled commands with support for one_time, interval, daily, weekly schedules; auto-executed by 30s scheduler loop

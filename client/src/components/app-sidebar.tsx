@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, Cpu, CalendarClock, Settings, Activity, Terminal } from "lucide-react";
+import { LayoutDashboard, Building2, Cpu, CalendarClock, Settings, Activity, Terminal, Timer } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -22,6 +22,7 @@ const menuItems = [
   { title: "Dispositivos", url: "/devices", icon: Cpu },
   { title: "Eventos", url: "/events", icon: CalendarClock },
   { title: "Comandos", url: "/commands", icon: Terminal },
+  { title: "Tareas", url: "/tasks", icon: Timer },
   { title: "Configuracion", url: "/settings", icon: Settings },
 ];
 
