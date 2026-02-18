@@ -451,7 +451,12 @@ export async function registerRoutes(
       return;
     }
 
-    const lines = commands.map(cmd => `C:${cmd.commandId}:${cmd.command}`);
+    const lines = commands.map(cmd => {
+      if (/^C:\d+:/.test(cmd.command)) {
+        return cmd.command;
+      }
+      return `C:${cmd.commandId}:${cmd.command}`;
+    });
     const responseBody = lines.join("\n") + "\n";
 
     addProtocolLog("OUT", sn, "/iclock/getrequest", "GET", `${commands.length} comando(s) enviado(s)`, responseBody, ip);

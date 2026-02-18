@@ -949,14 +949,14 @@ export default function Commands() {
             <div className="space-y-2">
               <Label>Comando raw</Label>
               <Input
-                placeholder="Ej: REBOOT, INFO, SET OPTION TimeZone=1"
+                placeholder="Ej: C:99:REBOOT, C:1:INFO, REBOOT"
                 value={rawCommand}
                 onChange={(e) => setRawCommand(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSendRaw(); }}
                 data-testid="input-raw-command"
               />
               <p className="text-xs text-muted-foreground">
-                Escribe el comando exacto tal como lo recibiria el dispositivo. Se enviara directamente sin procesar.
+                Si incluyes el prefijo C:ID: (ej: C:99:REBOOT) se enviara tal cual. Si no, se añadira automaticamente.
               </p>
             </div>
             <Button
