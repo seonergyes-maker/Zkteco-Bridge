@@ -13,7 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertScheduledTaskSchema, type ScheduledTask, type InsertScheduledTask, type Device } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, CalendarClock, Pencil, Trash2, Clock, Play, Pause, RotateCcw, Info, ClipboardCheck, FileText, Trash, Settings, CalendarSearch, UserPlus, UserMinus, DoorOpen } from "lucide-react";
+import { Plus, CalendarClock, Pencil, Trash2, Clock, Play, Pause, RotateCcw, Info, ClipboardCheck, FileText, Trash, Settings, CalendarSearch, UserPlus, UserMinus, DoorOpen, ImageMinus, BellOff, RefreshCw, Camera, Fingerprint, ScanLine, Lock, MessageSquare, Image, Download, Upload, Terminal, Search } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -32,11 +32,32 @@ const COMMAND_TYPES = [
   { value: "CHECK", label: "Verificar datos nuevos", icon: ClipboardCheck },
   { value: "LOG", label: "Subir registros", icon: FileText },
   { value: "CLEAR_LOG", label: "Borrar registros", icon: Trash },
+  { value: "CLEAR_DATA", label: "Borrar todos los datos", icon: Trash2 },
+  { value: "CLEAR_PHOTO", label: "Borrar fotos", icon: ImageMinus },
   { value: "SET_OPTION", label: "Configurar opcion", icon: Settings },
   { value: "QUERY_ATTLOG", label: "Consultar fichajes", icon: CalendarSearch },
+  { value: "QUERY_ATTPHOTO", label: "Consultar fotos de fichaje", icon: Camera },
+  { value: "QUERY_USERINFO", label: "Consultar info de usuario", icon: Search },
+  { value: "QUERY_FINGERTMP", label: "Consultar huella digital", icon: Fingerprint },
   { value: "DATA_USER", label: "Enviar usuario", icon: UserPlus },
   { value: "DATA_DEL_USER", label: "Eliminar usuario", icon: UserMinus },
+  { value: "DATA_FP", label: "Enviar huella digital", icon: Fingerprint },
+  { value: "DATA_DEL_FP", label: "Eliminar huella digital", icon: Fingerprint },
+  { value: "ENROLL_FP", label: "Registrar huella en dispositivo", icon: ScanLine },
   { value: "AC_UNLOCK", label: "Abrir puerta", icon: DoorOpen },
+  { value: "AC_UNALARM", label: "Desactivar alarma", icon: BellOff },
+  { value: "RELOAD_OPTIONS", label: "Recargar opciones", icon: RefreshCw },
+  { value: "UPDATE_TIMEZONE", label: "Configurar zona horaria", icon: Clock },
+  { value: "DELETE_TIMEZONE", label: "Eliminar zona horaria", icon: Clock },
+  { value: "UPDATE_GLOCK", label: "Configurar combinacion apertura", icon: Lock },
+  { value: "DELETE_GLOCK", label: "Eliminar combinacion apertura", icon: Lock },
+  { value: "UPDATE_SMS", label: "Enviar mensaje SMS", icon: MessageSquare },
+  { value: "UPDATE_USER_SMS", label: "Asignar SMS a usuario", icon: MessageSquare },
+  { value: "UPDATE_USERPIC", label: "Actualizar foto de usuario", icon: Image },
+  { value: "DELETE_USERPIC", label: "Eliminar foto de usuario", icon: ImageMinus },
+  { value: "SHELL", label: "Ejecutar comando del sistema", icon: Terminal },
+  { value: "GETFILE", label: "Descargar archivo del dispositivo", icon: Download },
+  { value: "PUTFILE", label: "Subir archivo al dispositivo", icon: Upload },
 ];
 
 const SCHEDULE_TYPES = [
@@ -235,6 +256,43 @@ export default function Tasks() {
     return device?.alias || serial;
   }
 
+  function needsParams(cmd: string) {
+    const cmdsWithParams = [
+      "SET_OPTION", "QUERY_ATTLOG", "QUERY_ATTPHOTO", "QUERY_USERINFO", "QUERY_FINGERTMP",
+      "DATA_USER", "DATA_DEL_USER", "DATA_FP", "DATA_DEL_FP", "ENROLL_FP",
+      "SHELL", "UPDATE_TIMEZONE", "DELETE_TIMEZONE", "UPDATE_GLOCK", "DELETE_GLOCK",
+      "UPDATE_SMS", "UPDATE_USER_SMS", "UPDATE_USERPIC", "DELETE_USERPIC", "GETFILE", "PUTFILE",
+    ];
+    return cmdsWithParams.includes(cmd);
+  }
+
+  function getParamPlaceholder(cmd: string): string {
+    const placeholders: Record<string, string> = {
+      SET_OPTION: '{"item":"Delay","value":"30"}',
+      QUERY_ATTLOG: '{"startTime":"2025-01-01 00:00:00","endTime":"2025-01-31 23:59:59"}',
+      QUERY_ATTPHOTO: '{"startTime":"2025-01-01 00:00:00","endTime":"2025-01-31 23:59:59"}',
+      QUERY_USERINFO: '{"pin":"101"}',
+      QUERY_FINGERTMP: '{"pin":"101","fingerId":0}',
+      DATA_USER: '{"pin":"101","name":"Juan"}',
+      DATA_DEL_USER: '{"pin":"101"}',
+      DATA_FP: '{"pin":"101","fid":0,"size":1024,"valid":1,"tmp":"..."}',
+      DATA_DEL_FP: '{"pin":"101","fid":0}',
+      ENROLL_FP: '{"pin":"101","fid":0,"retry":3,"overwrite":1}',
+      SHELL: '{"cmdString":"ls"}',
+      UPDATE_TIMEZONE: '{"tzid":1,"itime":"08:00-17:00"}',
+      DELETE_TIMEZONE: '{"tzid":1}',
+      UPDATE_GLOCK: '{"glid":1,"groupIds":"1,2","memberCount":2}',
+      DELETE_GLOCK: '{"glid":1}',
+      UPDATE_SMS: '{"msg":"Mensaje","tag":253,"uid":1}',
+      UPDATE_USER_SMS: '{"pin":"101","uid":1}',
+      UPDATE_USERPIC: '{"pin":"101","picFile":"photo.jpg"}',
+      DELETE_USERPIC: '{"pin":"101"}',
+      GETFILE: '{"filePath":"/mnt/mtdblock/config.ini"}',
+      PUTFILE: '{"url":"http://server/file.dat","filePath":"/mnt/mtdblock/file.dat"}',
+    };
+    return placeholders[cmd] || "{}";
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -307,13 +365,13 @@ export default function Tasks() {
                   </FormItem>
                 )} />
 
-                {(commandType === "SET_OPTION" || commandType === "QUERY_ATTLOG" || commandType === "DATA_USER" || commandType === "DATA_DEL_USER") && (
+                {needsParams(commandType) && (
                   <FormField control={form.control} name="commandParams" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Parametros (JSON)</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder={commandType === "SET_OPTION" ? '{"item":"Delay","value":"30"}' : commandType === "DATA_USER" ? '{"pin":"101","name":"Juan"}' : commandType === "DATA_DEL_USER" ? '{"pin":"101"}' : '{"startTime":"...","endTime":"..."}'}
+                          placeholder={getParamPlaceholder(commandType)}
                           {...field}
                           value={field.value ?? ""}
                           data-testid="input-task-params"

@@ -12,12 +12,26 @@ function buildCommandString(commandType: string, params?: any): string | null {
     case "CHECK": return "CHECK";
     case "LOG": return "LOG";
     case "CLEAR_LOG": return "CLEAR LOG";
+    case "CLEAR_DATA": return "CLEAR DATA";
+    case "CLEAR_PHOTO": return "CLEAR PHOTO";
+    case "AC_UNLOCK": return "AC_UNLOCK";
+    case "AC_UNALARM": return "AC_UNALARM";
+    case "RELOAD_OPTIONS": return "RELOAD OPTIONS";
     case "SET_OPTION":
       if (!params?.item || params?.value === undefined) return null;
       return `SET OPTION ${params.item}=${params.value}`;
     case "QUERY_ATTLOG":
       if (!params?.startTime || !params?.endTime) return null;
       return `QUERY ATTLOG StartTime=${params.startTime}\tEndTime=${params.endTime}`;
+    case "QUERY_ATTPHOTO":
+      if (!params?.startTime || !params?.endTime) return null;
+      return `QUERY ATTPHOTO StartTime=${params.startTime}\tEndTime=${params.endTime}`;
+    case "QUERY_USERINFO":
+      if (!params?.pin) return null;
+      return `QUERY USERINFO PIN=${params.pin}`;
+    case "QUERY_FINGERTMP":
+      if (!params?.pin || params?.fingerId === undefined) return null;
+      return `QUERY FINGERTMP PIN=${params.pin}\tFingerID=${params.fingerId}`;
     case "DATA_USER":
       if (!params?.pin) return null;
       {
@@ -27,12 +41,75 @@ function buildCommandString(commandType: string, params?: any): string | null {
         if (params.card) parts.push(`Card=${params.card}`);
         if (params.privilege !== undefined) parts.push(`Pri=${params.privilege}`);
         if (params.group !== undefined) parts.push(`Grp=${params.group}`);
+        if (params.tz !== undefined) parts.push(`TZ=${params.tz}`);
         return `DATA USER ${parts.join("\t")}`;
       }
     case "DATA_DEL_USER":
       if (!params?.pin) return null;
       return `DATA DEL_USER PIN=${params.pin}`;
-    case "AC_UNLOCK": return "AC_UNLOCK";
+    case "DATA_FP":
+      if (!params?.pin || params?.fid === undefined || !params?.size || params?.valid === undefined || !params?.tmp) return null;
+      return `DATA FP PIN=${params.pin}\tFID=${params.fid}\tSize=${params.size}\tValid=${params.valid}\tTMP=${params.tmp}`;
+    case "DATA_DEL_FP":
+      if (!params?.pin || params?.fid === undefined) return null;
+      return `DATA DEL_FP PIN=${params.pin}\tFID=${params.fid}`;
+    case "ENROLL_FP":
+      if (!params?.pin || params?.fid === undefined) return null;
+      {
+        const parts = [`PIN=${params.pin}`, `FID=${params.fid}`];
+        if (params.retry !== undefined) parts.push(`RETRY=${params.retry}`);
+        if (params.overwrite !== undefined) parts.push(`OVERWRITE=${params.overwrite}`);
+        return `ENROLL_FP ${parts.join("\t")}`;
+      }
+    case "UPDATE_USERPIC":
+      if (!params?.pin || !params?.picFile) return null;
+      {
+        const pin2 = params.pin2 !== undefined ? params.pin2 : params.pin;
+        return `UPDATE USERPIC PIN=${params.pin}\tPIN2=${pin2} PICFILE=${params.picFile}`;
+      }
+    case "DELETE_USERPIC":
+      if (!params?.pin) return null;
+      return `DELETE USERPIC PIN=${params.pin}`;
+    case "UPDATE_TIMEZONE":
+      if (params?.tzid === undefined || !params?.itime) return null;
+      {
+        const parts = [`TZID=${params.tzid}`, `ITIME=${params.itime}`];
+        if (params.reserve) parts.push(`RESERVE=${params.reserve}`);
+        return `UPDATE TIMEZONE ${parts.join("\t")}`;
+      }
+    case "DELETE_TIMEZONE":
+      if (params?.tzid === undefined) return null;
+      return `DELETL TIMEZONE TZID=${params.tzid}`;
+    case "UPDATE_GLOCK":
+      if (params?.glid === undefined || !params?.groupIds || params?.memberCount === undefined) return null;
+      {
+        const parts = [`GLID=${params.glid}`, `GROUPIDS=${params.groupIds}`, `MEMBERCOUNT=${params.memberCount}`];
+        if (params.reserve) parts.push(`RESERVE=${params.reserve}`);
+        return `UPDATE GLOCK ${parts.join("\t")}`;
+      }
+    case "DELETE_GLOCK":
+      if (params?.glid === undefined) return null;
+      return `DELETE GLOCK GLID=${params.glid}`;
+    case "UPDATE_SMS":
+      if (!params?.msg || params?.tag === undefined || params?.uid === undefined) return null;
+      {
+        const parts = [`MSG=${params.msg}`, `TAG=${params.tag}`, `UID=${params.uid}`];
+        if (params.min !== undefined) parts.push(`MIN=${params.min}`);
+        if (params.startTime) parts.push(`StartTime=${params.startTime}`);
+        return `UPDATE SMS ${parts.join("\t")}`;
+      }
+    case "UPDATE_USER_SMS":
+      if (!params?.pin || params?.uid === undefined) return null;
+      return `UPDATE USER_SMS PIN=${params.pin}\tUID=${params.uid}`;
+    case "SHELL":
+      if (!params?.cmdString) return null;
+      return `SHELL ${params.cmdString}`;
+    case "GETFILE":
+      if (!params?.filePath) return null;
+      return `GetFile ${params.filePath}`;
+    case "PUTFILE":
+      if (!params?.url || !params?.filePath) return null;
+      return `PutFile ${params.url} ${params.filePath}`;
     default: return null;
   }
 }

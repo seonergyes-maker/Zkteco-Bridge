@@ -15,7 +15,7 @@ Middleware application that receives push notifications from ZKTeco time clocks 
 - Device management with real-time online/offline status
 - Attendance event reception and storage
 - Automatic event forwarding to Oracle API with retry logic
-- Device command system (REBOOT, INFO, CHECK, LOG, CLEAR LOG, SET OPTION, QUERY ATTLOG, DATA USER, DATA DEL_USER, AC_UNLOCK)
+- Device command system: 31 commands including REBOOT, INFO, CHECK, LOG, CLEAR LOG/DATA/PHOTO, SET OPTION, QUERY ATTLOG/ATTPHOTO/USERINFO/FINGERTMP, DATA USER/DEL_USER/FP/DEL_FP, ENROLL_FP, AC_UNLOCK/UNALARM, RELOAD OPTIONS, UPDATE/DELETE TIMEZONE/GLOCK/SMS/USER_SMS/USERPIC, SHELL, GETFILE, PUTFILE
 - Dashboard with real-time statistics
 - Dark/Light theme support
 

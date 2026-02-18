@@ -5,12 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import type { Device, DeviceCommand } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Send, RotateCcw, Info, ClipboardCheck, FileText, Trash2, Settings, CalendarSearch, UserPlus, UserMinus, DoorOpen, Terminal, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import {
+  Send, RotateCcw, Info, ClipboardCheck, FileText, Trash2, Settings,
+  CalendarSearch, UserPlus, UserMinus, DoorOpen, Terminal, Clock,
+  CheckCircle2, XCircle, Loader2, ImageMinus, BellOff, RefreshCw,
+  Camera, UserSearch, Fingerprint, ScanLine, Lock, MessageSquare,
+  Image, Download, Upload,
+} from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import {
@@ -23,17 +29,46 @@ import {
 } from "@/components/ui/table";
 
 const COMMAND_TYPES = [
-  { value: "REBOOT", label: "Reiniciar dispositivo", icon: RotateCcw, description: "Reinicia el equipo", hasParams: false },
-  { value: "INFO", label: "Solicitar informacion", icon: Info, description: "Solicita informacion del equipo (modelo, firmware, etc.)", hasParams: false },
-  { value: "CHECK", label: "Verificar datos nuevos", icon: ClipboardCheck, description: "Fuerza al equipo a verificar y enviar datos nuevos", hasParams: false },
-  { value: "LOG", label: "Subir registros", icon: FileText, description: "Fuerza al equipo a subir registros pendientes", hasParams: false },
-  { value: "CLEAR_LOG", label: "Borrar registros", icon: Trash2, description: "Borra los registros de asistencia del dispositivo", hasParams: false },
-  { value: "SET_OPTION", label: "Configurar opcion", icon: Settings, description: "Cambia una opcion de configuracion del equipo", hasParams: true },
-  { value: "QUERY_ATTLOG", label: "Consultar asistencia", icon: CalendarSearch, description: "Consulta registros de asistencia en un rango de fechas", hasParams: true },
-  { value: "DATA_USER", label: "Agregar/modificar usuario", icon: UserPlus, description: "Agrega o modifica un usuario en el dispositivo", hasParams: true },
-  { value: "DATA_DEL_USER", label: "Eliminar usuario", icon: UserMinus, description: "Elimina un usuario del dispositivo", hasParams: true },
-  { value: "AC_UNLOCK", label: "Abrir puerta", icon: DoorOpen, description: "Envia senal de apertura de puerta", hasParams: false },
+  { value: "REBOOT", label: "Reiniciar dispositivo", icon: RotateCcw, description: "Reinicia el equipo", hasParams: false, group: "Basico" },
+  { value: "INFO", label: "Solicitar informacion", icon: Info, description: "Solicita informacion del equipo (modelo, firmware, etc.)", hasParams: false, group: "Basico" },
+  { value: "CHECK", label: "Verificar datos nuevos", icon: ClipboardCheck, description: "Fuerza al equipo a verificar y enviar datos nuevos", hasParams: false, group: "Basico" },
+  { value: "LOG", label: "Subir registros", icon: FileText, description: "Fuerza al equipo a subir registros pendientes", hasParams: false, group: "Basico" },
+  { value: "RELOAD_OPTIONS", label: "Recargar opciones", icon: RefreshCw, description: "Recarga las opciones de configuracion del equipo", hasParams: false, group: "Basico" },
+
+  { value: "CLEAR_LOG", label: "Borrar registros", icon: Trash2, description: "Borra los registros de asistencia del dispositivo", hasParams: false, group: "Datos" },
+  { value: "CLEAR_DATA", label: "Borrar todos los datos", icon: Trash2, description: "Borra todos los datos del dispositivo", hasParams: false, group: "Datos" },
+  { value: "CLEAR_PHOTO", label: "Borrar fotos", icon: ImageMinus, description: "Borra todas las fotos del dispositivo", hasParams: false, group: "Datos" },
+
+  { value: "DATA_USER", label: "Agregar/modificar usuario", icon: UserPlus, description: "Agrega o modifica un usuario en el dispositivo", hasParams: true, group: "Usuarios" },
+  { value: "DATA_DEL_USER", label: "Eliminar usuario", icon: UserMinus, description: "Elimina un usuario del dispositivo", hasParams: true, group: "Usuarios" },
+  { value: "QUERY_USERINFO", label: "Consultar info de usuario", icon: UserSearch, description: "Consulta la informacion de un usuario por PIN", hasParams: true, group: "Usuarios" },
+
+  { value: "DATA_FP", label: "Enviar huella digital", icon: Fingerprint, description: "Envia datos de huella digital al dispositivo", hasParams: true, group: "Huellas" },
+  { value: "DATA_DEL_FP", label: "Eliminar huella digital", icon: Fingerprint, description: "Elimina una huella digital del dispositivo", hasParams: true, group: "Huellas" },
+  { value: "QUERY_FINGERTMP", label: "Consultar huella digital", icon: Fingerprint, description: "Consulta datos de huella digital de un usuario", hasParams: true, group: "Huellas" },
+  { value: "ENROLL_FP", label: "Registrar huella en dispositivo", icon: ScanLine, description: "Inicia el proceso de registro de huella en el dispositivo", hasParams: true, group: "Huellas" },
+
+  { value: "QUERY_ATTLOG", label: "Consultar asistencia", icon: CalendarSearch, description: "Consulta registros de asistencia en un rango de fechas", hasParams: true, group: "Consultas" },
+  { value: "QUERY_ATTPHOTO", label: "Consultar fotos de fichaje", icon: Camera, description: "Consulta fotos de fichaje en un rango de fechas", hasParams: true, group: "Consultas" },
+
+  { value: "AC_UNLOCK", label: "Abrir puerta", icon: DoorOpen, description: "Envia senal de apertura de puerta", hasParams: false, group: "Control de acceso" },
+  { value: "AC_UNALARM", label: "Desactivar alarma", icon: BellOff, description: "Desactiva la alarma del dispositivo", hasParams: false, group: "Control de acceso" },
+  { value: "UPDATE_TIMEZONE", label: "Configurar zona horaria", icon: Clock, description: "Configura una zona horaria en el dispositivo", hasParams: true, group: "Control de acceso" },
+  { value: "DELETE_TIMEZONE", label: "Eliminar zona horaria", icon: Clock, description: "Elimina una zona horaria del dispositivo", hasParams: true, group: "Control de acceso" },
+  { value: "UPDATE_GLOCK", label: "Configurar combinacion de apertura", icon: Lock, description: "Configura una combinacion de apertura en grupo", hasParams: true, group: "Control de acceso" },
+  { value: "DELETE_GLOCK", label: "Eliminar combinacion de apertura", icon: Lock, description: "Elimina una combinacion de apertura en grupo", hasParams: true, group: "Control de acceso" },
+
+  { value: "SET_OPTION", label: "Configurar opcion", icon: Settings, description: "Cambia una opcion de configuracion del equipo", hasParams: true, group: "Configuracion" },
+  { value: "UPDATE_SMS", label: "Enviar mensaje SMS", icon: MessageSquare, description: "Envia un mensaje SMS al dispositivo", hasParams: true, group: "Configuracion" },
+  { value: "UPDATE_USER_SMS", label: "Asignar SMS a usuario", icon: MessageSquare, description: "Asigna un SMS a un usuario especifico", hasParams: true, group: "Configuracion" },
+  { value: "UPDATE_USERPIC", label: "Actualizar foto de usuario", icon: Image, description: "Actualiza la foto de un usuario en el dispositivo", hasParams: true, group: "Configuracion" },
+  { value: "DELETE_USERPIC", label: "Eliminar foto de usuario", icon: ImageMinus, description: "Elimina la foto de un usuario del dispositivo", hasParams: true, group: "Configuracion" },
+  { value: "SHELL", label: "Ejecutar comando del sistema", icon: Terminal, description: "Ejecuta un comando en el sistema operativo del dispositivo", hasParams: true, group: "Configuracion" },
+  { value: "GETFILE", label: "Descargar archivo del dispositivo", icon: Download, description: "Descarga un archivo desde el dispositivo", hasParams: true, group: "Configuracion" },
+  { value: "PUTFILE", label: "Subir archivo al dispositivo", icon: Upload, description: "Sube un archivo al dispositivo desde una URL", hasParams: true, group: "Configuracion" },
 ];
+
+const COMMAND_GROUPS = ["Basico", "Datos", "Usuarios", "Huellas", "Consultas", "Control de acceso", "Configuracion"];
 
 export default function Commands() {
   const [selectedDevice, setSelectedDevice] = useState<string>("");
@@ -51,6 +86,37 @@ export default function Commands() {
   const [userCard, setUserCard] = useState("");
   const [userPrivilege, setUserPrivilege] = useState("0");
   const [delUserPin, setDelUserPin] = useState("");
+
+  const [shellCmd, setShellCmd] = useState("");
+  const [queryPin, setQueryPin] = useState("");
+  const [fingerId, setFingerId] = useState("");
+  const [fpPin, setFpPin] = useState("");
+  const [fpSize, setFpSize] = useState("");
+  const [fpValid, setFpValid] = useState("1");
+  const [fpTmp, setFpTmp] = useState("");
+  const [enrollRetry, setEnrollRetry] = useState("3");
+  const [enrollOverwrite, setEnrollOverwrite] = useState("0");
+  const [tzId, setTzId] = useState("");
+  const [tzItime, setTzItime] = useState("");
+  const [tzReserve, setTzReserve] = useState("");
+  const [glockId, setGlockId] = useState("");
+  const [glockGroupIds, setGlockGroupIds] = useState("");
+  const [glockMemberCount, setGlockMemberCount] = useState("");
+  const [glockReserve, setGlockReserve] = useState("");
+  const [smsMsg, setSmsMsg] = useState("");
+  const [smsTag, setSmsTag] = useState("253");
+  const [smsUid, setSmsUid] = useState("");
+  const [smsMin, setSmsMin] = useState("");
+  const [smsStartTime, setSmsStartTime] = useState("");
+  const [userSmsPin, setUserSmsPin] = useState("");
+  const [userSmsUid, setUserSmsUid] = useState("");
+  const [userpicPin, setUserpicPin] = useState("");
+  const [userpicFile, setUserpicFile] = useState("");
+  const [getFilePath, setGetFilePath] = useState("");
+  const [putFileUrl, setPutFileUrl] = useState("");
+  const [putFilePath, setPutFilePath] = useState("");
+  const [photoStartTime, setPhotoStartTime] = useState("");
+  const [photoEndTime, setPhotoEndTime] = useState("");
 
   const { data: devices, isLoading: devicesLoading } = useQuery<Device[]>({
     queryKey: ["/api/devices"],
@@ -87,6 +153,19 @@ export default function Commands() {
     setStartTime(""); setEndTime("");
     setUserPin(""); setUserName(""); setUserPassword(""); setUserCard(""); setUserPrivilege("0");
     setDelUserPin("");
+    setShellCmd("");
+    setQueryPin("");
+    setFingerId(""); setFpPin("");
+    setFpSize(""); setFpValid("1"); setFpTmp("");
+    setEnrollRetry("3"); setEnrollOverwrite("0");
+    setTzId(""); setTzItime(""); setTzReserve("");
+    setGlockId(""); setGlockGroupIds(""); setGlockMemberCount(""); setGlockReserve("");
+    setSmsMsg(""); setSmsTag("253"); setSmsUid(""); setSmsMin(""); setSmsStartTime("");
+    setUserSmsPin(""); setUserSmsUid("");
+    setUserpicPin(""); setUserpicFile("");
+    setGetFilePath("");
+    setPutFileUrl(""); setPutFilePath("");
+    setPhotoStartTime(""); setPhotoEndTime("");
   }
 
   function formatDateTimeLocal(dtLocal: string): string {
@@ -113,6 +192,13 @@ export default function Commands() {
         }
         params = { startTime: formatDateTimeLocal(startTime), endTime: formatDateTimeLocal(endTime) };
         break;
+      case "QUERY_ATTPHOTO":
+        if (!photoStartTime || !photoEndTime) {
+          toast({ title: "Faltan parametros", description: "Debes indicar fecha de inicio y fin.", variant: "destructive" });
+          return;
+        }
+        params = { startTime: formatDateTimeLocal(photoStartTime), endTime: formatDateTimeLocal(photoEndTime) };
+        break;
       case "DATA_USER":
         if (!userPin.trim()) {
           toast({ title: "Falta PIN", description: "El PIN del empleado es obligatorio.", variant: "destructive" });
@@ -132,6 +218,124 @@ export default function Commands() {
           return;
         }
         params = { pin: delUserPin.trim() };
+        break;
+      case "QUERY_USERINFO":
+        if (!queryPin.trim()) {
+          toast({ title: "Falta PIN", description: "Debes indicar el PIN del usuario a consultar.", variant: "destructive" });
+          return;
+        }
+        params = { pin: queryPin.trim() };
+        break;
+      case "QUERY_FINGERTMP":
+        if (!fpPin.trim() || fingerId === "") {
+          toast({ title: "Faltan parametros", description: "Debes indicar el PIN y el ID de dedo.", variant: "destructive" });
+          return;
+        }
+        params = { pin: fpPin.trim(), fingerId: parseInt(fingerId) };
+        break;
+      case "DATA_FP":
+        if (!fpPin.trim() || fingerId === "" || !fpSize.trim() || !fpTmp.trim()) {
+          toast({ title: "Faltan parametros", description: "PIN, ID de dedo, tamano y datos de huella son obligatorios.", variant: "destructive" });
+          return;
+        }
+        params = { pin: fpPin.trim(), fid: parseInt(fingerId), size: parseInt(fpSize), valid: parseInt(fpValid), tmp: fpTmp.trim() };
+        break;
+      case "DATA_DEL_FP":
+        if (!fpPin.trim() || fingerId === "") {
+          toast({ title: "Faltan parametros", description: "Debes indicar el PIN y el ID de dedo.", variant: "destructive" });
+          return;
+        }
+        params = { pin: fpPin.trim(), fid: parseInt(fingerId) };
+        break;
+      case "ENROLL_FP":
+        if (!fpPin.trim() || fingerId === "") {
+          toast({ title: "Faltan parametros", description: "Debes indicar el PIN y el ID de dedo.", variant: "destructive" });
+          return;
+        }
+        params = { pin: fpPin.trim(), fid: parseInt(fingerId), retry: parseInt(enrollRetry) || 3, overwrite: parseInt(enrollOverwrite) };
+        break;
+      case "SHELL":
+        if (!shellCmd.trim()) {
+          toast({ title: "Falta comando", description: "Debes indicar el comando a ejecutar.", variant: "destructive" });
+          return;
+        }
+        params = { cmdString: shellCmd.trim() };
+        break;
+      case "UPDATE_TIMEZONE":
+        if (!tzId.trim() || !tzItime.trim()) {
+          toast({ title: "Faltan parametros", description: "El ID de zona horaria y el intervalo de tiempo son obligatorios.", variant: "destructive" });
+          return;
+        }
+        params = { tzid: tzId.trim(), itime: tzItime.trim(), reserve: tzReserve.trim() || undefined };
+        break;
+      case "DELETE_TIMEZONE":
+        if (!tzId.trim()) {
+          toast({ title: "Falta parametro", description: "Debes indicar el ID de la zona horaria a eliminar.", variant: "destructive" });
+          return;
+        }
+        params = { tzid: tzId.trim() };
+        break;
+      case "UPDATE_GLOCK":
+        if (!glockId.trim() || !glockGroupIds.trim() || !glockMemberCount.trim()) {
+          toast({ title: "Faltan parametros", description: "ID, IDs de grupo y cantidad de miembros son obligatorios.", variant: "destructive" });
+          return;
+        }
+        params = { glid: glockId.trim(), groupIds: glockGroupIds.trim(), memberCount: parseInt(glockMemberCount), reserve: glockReserve.trim() || undefined };
+        break;
+      case "DELETE_GLOCK":
+        if (!glockId.trim()) {
+          toast({ title: "Falta parametro", description: "Debes indicar el ID de la combinacion a eliminar.", variant: "destructive" });
+          return;
+        }
+        params = { glid: glockId.trim() };
+        break;
+      case "UPDATE_SMS":
+        if (!smsMsg.trim() || !smsUid.trim()) {
+          toast({ title: "Faltan parametros", description: "El mensaje y el ID de usuario son obligatorios.", variant: "destructive" });
+          return;
+        }
+        params = {
+          msg: smsMsg.trim(),
+          tag: parseInt(smsTag),
+          uid: smsUid.trim(),
+          min: smsMin.trim() || undefined,
+          startTime: smsStartTime ? formatDateTimeLocal(smsStartTime) : undefined,
+        };
+        break;
+      case "UPDATE_USER_SMS":
+        if (!userSmsPin.trim() || !userSmsUid.trim()) {
+          toast({ title: "Faltan parametros", description: "El PIN y el ID de SMS son obligatorios.", variant: "destructive" });
+          return;
+        }
+        params = { pin: userSmsPin.trim(), uid: userSmsUid.trim() };
+        break;
+      case "UPDATE_USERPIC":
+        if (!userpicPin.trim() || !userpicFile.trim()) {
+          toast({ title: "Faltan parametros", description: "El PIN y el archivo de foto son obligatorios.", variant: "destructive" });
+          return;
+        }
+        params = { pin: userpicPin.trim(), picFile: userpicFile.trim() };
+        break;
+      case "DELETE_USERPIC":
+        if (!queryPin.trim()) {
+          toast({ title: "Falta PIN", description: "Debes indicar el PIN del usuario.", variant: "destructive" });
+          return;
+        }
+        params = { pin: queryPin.trim() };
+        break;
+      case "GETFILE":
+        if (!getFilePath.trim()) {
+          toast({ title: "Falta ruta", description: "Debes indicar la ruta del archivo a descargar.", variant: "destructive" });
+          return;
+        }
+        params = { filePath: getFilePath.trim() };
+        break;
+      case "PUTFILE":
+        if (!putFileUrl.trim() || !putFilePath.trim()) {
+          toast({ title: "Faltan parametros", description: "La URL y la ruta de destino son obligatorios.", variant: "destructive" });
+          return;
+        }
+        params = { url: putFileUrl.trim(), filePath: putFilePath.trim() };
         break;
     }
 
@@ -157,6 +361,21 @@ export default function Commands() {
     return isSuccess
       ? <Badge variant="default" className="text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />OK</Badge>
       : <Badge variant="destructive" className="text-xs"><XCircle className="w-3 h-3 mr-1" />Error: {returnValue}</Badge>;
+  }
+
+  function renderFingerIdSelect(value: string, onChange: (v: string) => void, testId: string) {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger data-testid={testId}>
+          <SelectValue placeholder="Selecciona dedo" />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: 10 }, (_, i) => (
+            <SelectItem key={i} value={String(i)}>{i}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
   }
 
   return (
@@ -202,14 +421,23 @@ export default function Commands() {
                   <SelectValue placeholder="Selecciona un comando" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMMAND_TYPES.map((cmd) => (
-                    <SelectItem key={cmd.value} value={cmd.value}>
-                      <div className="flex items-center gap-2">
-                        <cmd.icon className="w-3.5 h-3.5" />
-                        {cmd.label}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {COMMAND_GROUPS.map((group) => {
+                    const groupCmds = COMMAND_TYPES.filter(c => c.group === group);
+                    if (groupCmds.length === 0) return null;
+                    return (
+                      <SelectGroup key={group}>
+                        <SelectLabel>{group}</SelectLabel>
+                        {groupCmds.map((cmd) => (
+                          <SelectItem key={cmd.value} value={cmd.value}>
+                            <div className="flex items-center gap-2">
+                              <cmd.icon className="w-3.5 h-3.5" />
+                              {cmd.label}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -242,6 +470,20 @@ export default function Commands() {
                 <div className="space-y-2">
                   <Label>Fecha fin</Label>
                   <Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} data-testid="input-query-end" />
+                </div>
+              </>
+            )}
+
+            {commandType === "QUERY_ATTPHOTO" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Fecha inicio</Label>
+                  <Input type="datetime-local" value={photoStartTime} onChange={(e) => setPhotoStartTime(e.target.value)} data-testid="input-photo-start" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fecha fin</Label>
+                  <Input type="datetime-local" value={photoEndTime} onChange={(e) => setPhotoEndTime(e.target.value)} data-testid="input-photo-end" />
                 </div>
               </>
             )}
@@ -288,6 +530,264 @@ export default function Commands() {
                 <div className="space-y-2">
                   <Label>PIN del usuario a eliminar *</Label>
                   <Input placeholder="Ej: 101" value={delUserPin} onChange={(e) => setDelUserPin(e.target.value)} data-testid="input-del-user-pin" />
+                </div>
+              </>
+            )}
+
+            {(commandType === "QUERY_USERINFO" || commandType === "DELETE_USERPIC") && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario *</Label>
+                  <Input placeholder="Ej: 101" value={queryPin} onChange={(e) => setQueryPin(e.target.value)} data-testid="input-query-pin" />
+                </div>
+              </>
+            )}
+
+            {commandType === "QUERY_FINGERTMP" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario *</Label>
+                  <Input placeholder="Ej: 101" value={fpPin} onChange={(e) => setFpPin(e.target.value)} data-testid="input-fp-pin" />
+                </div>
+                <div className="space-y-2">
+                  <Label>ID de dedo (0-9) *</Label>
+                  {renderFingerIdSelect(fingerId, setFingerId, "select-finger-id")}
+                </div>
+              </>
+            )}
+
+            {commandType === "DATA_FP" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario *</Label>
+                  <Input placeholder="Ej: 101" value={fpPin} onChange={(e) => setFpPin(e.target.value)} data-testid="input-fp-pin-data" />
+                </div>
+                <div className="space-y-2">
+                  <Label>ID de dedo (0-9) *</Label>
+                  {renderFingerIdSelect(fingerId, setFingerId, "select-finger-id-data")}
+                </div>
+                <div className="space-y-2">
+                  <Label>Tamano *</Label>
+                  <Input placeholder="Tamano de los datos" value={fpSize} onChange={(e) => setFpSize(e.target.value)} data-testid="input-fp-size" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valido</Label>
+                  <Select value={fpValid} onValueChange={setFpValid}>
+                    <SelectTrigger data-testid="select-fp-valid">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Si (1)</SelectItem>
+                      <SelectItem value="0">No (0)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Datos de huella (base64) *</Label>
+                  <Input placeholder="Datos en base64" value={fpTmp} onChange={(e) => setFpTmp(e.target.value)} data-testid="input-fp-tmp" />
+                </div>
+              </>
+            )}
+
+            {commandType === "DATA_DEL_FP" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario *</Label>
+                  <Input placeholder="Ej: 101" value={fpPin} onChange={(e) => setFpPin(e.target.value)} data-testid="input-fp-pin-del" />
+                </div>
+                <div className="space-y-2">
+                  <Label>ID de dedo (0-9) *</Label>
+                  {renderFingerIdSelect(fingerId, setFingerId, "select-finger-id-del")}
+                </div>
+              </>
+            )}
+
+            {commandType === "ENROLL_FP" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario *</Label>
+                  <Input placeholder="Ej: 101" value={fpPin} onChange={(e) => setFpPin(e.target.value)} data-testid="input-fp-pin-enroll" />
+                </div>
+                <div className="space-y-2">
+                  <Label>ID de dedo (0-9) *</Label>
+                  {renderFingerIdSelect(fingerId, setFingerId, "select-finger-id-enroll")}
+                </div>
+                <div className="space-y-2">
+                  <Label>Reintentos</Label>
+                  <Input placeholder="3" value={enrollRetry} onChange={(e) => setEnrollRetry(e.target.value)} data-testid="input-enroll-retry" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sobrescribir</Label>
+                  <Select value={enrollOverwrite} onValueChange={setEnrollOverwrite}>
+                    <SelectTrigger data-testid="select-enroll-overwrite">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No (0)</SelectItem>
+                      <SelectItem value="1">Si (1)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {commandType === "SHELL" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Comando del sistema *</Label>
+                  <Input placeholder="Ej: ls /mnt/mtdblock" value={shellCmd} onChange={(e) => setShellCmd(e.target.value)} data-testid="input-shell-cmd" />
+                </div>
+              </>
+            )}
+
+            {commandType === "UPDATE_TIMEZONE" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>ID de zona horaria *</Label>
+                  <Input placeholder="Ej: 1" value={tzId} onChange={(e) => setTzId(e.target.value)} data-testid="input-tz-id" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Intervalo de tiempo *</Label>
+                  <Input placeholder="Ej: 0000-2359" value={tzItime} onChange={(e) => setTzItime(e.target.value)} data-testid="input-tz-itime" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reserva</Label>
+                  <Input placeholder="Opcional" value={tzReserve} onChange={(e) => setTzReserve(e.target.value)} data-testid="input-tz-reserve" />
+                </div>
+              </>
+            )}
+
+            {commandType === "DELETE_TIMEZONE" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>ID de zona horaria a eliminar *</Label>
+                  <Input placeholder="Ej: 1" value={tzId} onChange={(e) => setTzId(e.target.value)} data-testid="input-tz-id-del" />
+                </div>
+              </>
+            )}
+
+            {commandType === "UPDATE_GLOCK" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>ID de combinacion *</Label>
+                  <Input placeholder="Ej: 1" value={glockId} onChange={(e) => setGlockId(e.target.value)} data-testid="input-glock-id" />
+                </div>
+                <div className="space-y-2">
+                  <Label>IDs de grupo *</Label>
+                  <Input placeholder="Ej: 1,2,3" value={glockGroupIds} onChange={(e) => setGlockGroupIds(e.target.value)} data-testid="input-glock-group-ids" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cantidad de miembros *</Label>
+                  <Input placeholder="Ej: 3" value={glockMemberCount} onChange={(e) => setGlockMemberCount(e.target.value)} data-testid="input-glock-member-count" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reserva</Label>
+                  <Input placeholder="Opcional" value={glockReserve} onChange={(e) => setGlockReserve(e.target.value)} data-testid="input-glock-reserve" />
+                </div>
+              </>
+            )}
+
+            {commandType === "DELETE_GLOCK" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>ID de combinacion a eliminar *</Label>
+                  <Input placeholder="Ej: 1" value={glockId} onChange={(e) => setGlockId(e.target.value)} data-testid="input-glock-id-del" />
+                </div>
+              </>
+            )}
+
+            {commandType === "UPDATE_SMS" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Mensaje *</Label>
+                  <Input placeholder="Texto del mensaje" value={smsMsg} onChange={(e) => setSmsMsg(e.target.value)} data-testid="input-sms-msg" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo (tag)</Label>
+                  <Select value={smsTag} onValueChange={setSmsTag}>
+                    <SelectTrigger data-testid="select-sms-tag">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="253">Notificacion (253)</SelectItem>
+                      <SelectItem value="254">Usuario (254)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>ID de usuario *</Label>
+                  <Input placeholder="Ej: 1" value={smsUid} onChange={(e) => setSmsUid(e.target.value)} data-testid="input-sms-uid" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Minutos</Label>
+                  <Input placeholder="Opcional" value={smsMin} onChange={(e) => setSmsMin(e.target.value)} data-testid="input-sms-min" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fecha inicio</Label>
+                  <Input type="datetime-local" value={smsStartTime} onChange={(e) => setSmsStartTime(e.target.value)} data-testid="input-sms-start-time" />
+                </div>
+              </>
+            )}
+
+            {commandType === "UPDATE_USER_SMS" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario *</Label>
+                  <Input placeholder="Ej: 101" value={userSmsPin} onChange={(e) => setUserSmsPin(e.target.value)} data-testid="input-user-sms-pin" />
+                </div>
+                <div className="space-y-2">
+                  <Label>ID de SMS *</Label>
+                  <Input placeholder="Ej: 1" value={userSmsUid} onChange={(e) => setUserSmsUid(e.target.value)} data-testid="input-user-sms-uid" />
+                </div>
+              </>
+            )}
+
+            {commandType === "UPDATE_USERPIC" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario *</Label>
+                  <Input placeholder="Ej: 101" value={userpicPin} onChange={(e) => setUserpicPin(e.target.value)} data-testid="input-userpic-pin" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Archivo de foto *</Label>
+                  <Input placeholder="Ej: /mnt/user/photo.jpg" value={userpicFile} onChange={(e) => setUserpicFile(e.target.value)} data-testid="input-userpic-file" />
+                </div>
+              </>
+            )}
+
+            {commandType === "GETFILE" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Ruta del archivo *</Label>
+                  <Input placeholder="Ej: /mnt/mtdblock/data.dat" value={getFilePath} onChange={(e) => setGetFilePath(e.target.value)} data-testid="input-getfile-path" />
+                </div>
+              </>
+            )}
+
+            {commandType === "PUTFILE" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>URL de origen *</Label>
+                  <Input placeholder="Ej: https://example.com/file.dat" value={putFileUrl} onChange={(e) => setPutFileUrl(e.target.value)} data-testid="input-putfile-url" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Ruta de destino *</Label>
+                  <Input placeholder="Ej: /mnt/mtdblock/file.dat" value={putFilePath} onChange={(e) => setPutFilePath(e.target.value)} data-testid="input-putfile-path" />
                 </div>
               </>
             )}
