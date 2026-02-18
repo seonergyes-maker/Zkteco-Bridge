@@ -351,10 +351,16 @@ export default function Commands() {
 
   function getReturnBadge(returnValue: string | null) {
     if (!returnValue) return null;
-    const isSuccess = returnValue === "0";
-    return isSuccess
-      ? <Badge variant="default" className="text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />OK</Badge>
-      : <Badge variant="destructive" className="text-xs"><XCircle className="w-3 h-3 mr-1" />Error: {returnValue}</Badge>;
+    if (returnValue === "0") {
+      return <Badge variant="default" className="text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />OK</Badge>;
+    }
+    const errorLabels: Record<string, string> = {
+      "-1": "Error de parametros",
+      "-3": "Error de acceso",
+      "-1002": "No Soportado",
+    };
+    const label = errorLabels[returnValue] || `Error: ${returnValue}`;
+    return <Badge variant="destructive" className="text-xs"><XCircle className="w-3 h-3 mr-1" />{label}</Badge>;
   }
 
   function renderFingerIdSelect(value: string, onChange: (v: string) => void, testId: string) {
