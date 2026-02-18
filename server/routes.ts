@@ -707,6 +707,11 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/commands", async (_req: Request, res: Response) => {
+    await storage.clearCommandHistory();
+    res.json({ message: "Historial de comandos borrado" });
+  });
+
   app.post("/api/commands/raw", async (req: Request, res: Response) => {
     const { deviceSerial, rawCommand } = req.body;
 

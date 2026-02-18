@@ -40,6 +40,7 @@ export interface IStorage {
   getCommandHistory(serial?: string, limit?: number): Promise<DeviceCommand[]>;
   createCommand(serial: string, commandId: string, command: string): Promise<DeviceCommand>;
   updateCommandResult(commandId: string, returnValue: string, returnData?: string): Promise<void>;
+  clearCommandHistory(): Promise<void>;
 
   getScheduledTasks(): Promise<ScheduledTask[]>;
   getScheduledTask(id: number): Promise<ScheduledTask | undefined>;
@@ -221,6 +222,10 @@ export class DatabaseStorage implements IStorage {
       returnData: returnData || null,
       executedAt: new Date(),
     }).where(eq(deviceCommands.commandId, commandId));
+  }
+
+  async clearCommandHistory(): Promise<void> {
+    await db.delete(deviceCommands);
   }
 
   async getDashboardStats() {

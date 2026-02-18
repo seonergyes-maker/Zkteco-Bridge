@@ -165,6 +165,19 @@ export default function Commands() {
     },
   });
 
+  const clearHistoryMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/commands");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commands"] });
+      toast({ title: "Historial limpiado", description: "Se han borrado todos los comandos del historial." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al limpiar historial", description: error.message, variant: "destructive" });
+    },
+  });
+
   function handleSendRaw() {
     if (!rawDevice || !rawCommand.trim()) return;
     rawMutation.mutate({ deviceSerial: rawDevice, rawCommand: rawCommand.trim() });
@@ -982,19 +995,31 @@ export default function Commands() {
           <CardHeader>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <CardTitle className="text-base">Historial de comandos</CardTitle>
-              <Select value={filterDevice} onValueChange={setFilterDevice}>
-                <SelectTrigger className="w-[220px]" data-testid="select-filter-device">
-                  <SelectValue placeholder="Filtrar por dispositivo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los dispositivos</SelectItem>
-                  {devices?.map((d) => (
-                    <SelectItem key={d.serialNumber} value={d.serialNumber}>
-                      {d.alias || d.serialNumber}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={filterDevice} onValueChange={setFilterDevice}>
+                  <SelectTrigger className="w-[220px]" data-testid="select-filter-device">
+                    <SelectValue placeholder="Filtrar por dispositivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los dispositivos</SelectItem>
+                    {devices?.map((d) => (
+                      <SelectItem key={d.serialNumber} value={d.serialNumber}>
+                        {d.alias || d.serialNumber}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => clearHistoryMutation.mutate()}
+                  disabled={clearHistoryMutation.isPending || !commands?.length}
+                  data-testid="button-clear-history"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Limpiar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
