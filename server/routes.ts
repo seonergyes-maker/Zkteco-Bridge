@@ -489,14 +489,14 @@ export async function registerRoutes(
       await storage.updateCommandResult(cmdId, returnVal, cmdData || undefined);
 
       if (cmdData && sn) {
-        const infoLines = cmdData.split(",");
+        const infoLines = cmdData.split("\n");
         let deviceName = "";
         let fwVersion = "";
         for (const line of infoLines) {
           const trimmed = line.trim();
-          if (trimmed.startsWith("~DeviceName=")) deviceName = trimmed.split("=")[1]?.trim() || "";
-          if (trimmed.startsWith("DeviceName=")) deviceName = deviceName || trimmed.split("=")[1]?.trim() || "";
-          if (trimmed.startsWith("FWVersion=")) fwVersion = trimmed.split("=")[1]?.trim() || "";
+          if (trimmed.startsWith("~DeviceName=")) deviceName = trimmed.substring("~DeviceName=".length).trim();
+          else if (trimmed.startsWith("DeviceName=") && !deviceName) deviceName = trimmed.substring("DeviceName=".length).trim();
+          if (trimmed.startsWith("FWVersion=")) fwVersion = trimmed.substring("FWVersion=".length).trim();
         }
         if (deviceName || fwVersion) {
           await storage.updateDeviceLastSeen(sn, undefined, fwVersion || undefined, deviceName || undefined);
