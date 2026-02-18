@@ -41,7 +41,7 @@ const COMMAND_TYPES = [
 
   { value: "DATA_USER", label: "Agregar/modificar usuario", icon: UserPlus, description: "Agrega o modifica un usuario en el dispositivo", hasParams: true, group: "Usuarios" },
   { value: "DATA_DEL_USER", label: "Eliminar usuario", icon: UserMinus, description: "Elimina un usuario del dispositivo", hasParams: true, group: "Usuarios" },
-  { value: "QUERY_USERINFO", label: "Consultar info de usuario", icon: UserSearch, description: "Consulta la informacion de un usuario por PIN", hasParams: true, group: "Usuarios" },
+  { value: "QUERY_USERINFO", label: "Consultar info de usuario", icon: UserSearch, description: "Consulta usuarios del dispositivo (PIN opcional, sin PIN consulta todos)", hasParams: true, group: "Usuarios" },
 
   { value: "DATA_FP", label: "Enviar huella digital", icon: Fingerprint, description: "Envia datos de huella digital al dispositivo", hasParams: true, group: "Huellas" },
   { value: "DATA_DEL_FP", label: "Eliminar huella digital", icon: Fingerprint, description: "Elimina una huella digital del dispositivo", hasParams: true, group: "Huellas" },
@@ -220,18 +220,12 @@ export default function Commands() {
         params = { pin: delUserPin.trim() };
         break;
       case "QUERY_USERINFO":
-        if (!queryPin.trim()) {
-          toast({ title: "Falta PIN", description: "Debes indicar el PIN del usuario a consultar.", variant: "destructive" });
-          return;
-        }
-        params = { pin: queryPin.trim() };
+        params = queryPin.trim() ? { pin: queryPin.trim() } : {};
         break;
       case "QUERY_FINGERTMP":
-        if (!fpPin.trim() || fingerId === "") {
-          toast({ title: "Faltan parametros", description: "Debes indicar el PIN y el ID de dedo.", variant: "destructive" });
-          return;
-        }
-        params = { pin: fpPin.trim(), fingerId: parseInt(fingerId) };
+        params = {};
+        if (fpPin.trim()) params.pin = fpPin.trim();
+        if (fingerId !== "") params.fingerId = parseInt(fingerId);
         break;
       case "DATA_FP":
         if (!fpPin.trim() || fingerId === "" || !fpSize.trim() || !fpTmp.trim()) {
@@ -613,12 +607,22 @@ export default function Commands() {
               </>
             )}
 
-            {(commandType === "QUERY_USERINFO" || commandType === "DELETE_USERPIC") && (
+            {commandType === "QUERY_USERINFO" && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>PIN del usuario (opcional, vacio = todos)</Label>
+                  <Input placeholder="Vacio para consultar todos" value={queryPin} onChange={(e) => setQueryPin(e.target.value)} data-testid="input-query-pin" />
+                </div>
+              </>
+            )}
+
+            {commandType === "DELETE_USERPIC" && (
               <>
                 <Separator />
                 <div className="space-y-2">
                   <Label>PIN del usuario *</Label>
-                  <Input placeholder="Ej: 101" value={queryPin} onChange={(e) => setQueryPin(e.target.value)} data-testid="input-query-pin" />
+                  <Input placeholder="Ej: 101" value={queryPin} onChange={(e) => setQueryPin(e.target.value)} data-testid="input-query-pin-userpic" />
                 </div>
               </>
             )}

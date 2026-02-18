@@ -27,11 +27,9 @@ function buildCommandString(commandType: string, params?: any): string | null {
       if (!params?.startTime || !params?.endTime) return null;
       return `QUERY ATTPHOTO StartTime=${params.startTime}\tEndTime=${params.endTime}`;
     case "QUERY_USERINFO":
-      if (!params?.pin) return null;
-      return `QUERY USERINFO PIN=${params.pin}`;
+      return params?.pin ? `QUERY USERINFO PIN=${params.pin}` : `QUERY USERINFO`;
     case "QUERY_FINGERTMP":
-      if (!params?.pin || params?.fingerId === undefined) return null;
-      return `QUERY FINGERTMP PIN=${params.pin}\tFingerID=${params.fingerId}`;
+      return params?.pin ? `QUERY FINGERTMP PIN=${params.pin}` : `QUERY FINGERTMP`;
     case "DATA_USER":
       if (!params?.pin) return null;
       {
