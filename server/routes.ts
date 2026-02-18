@@ -287,11 +287,8 @@ export async function registerRoutes(
       const existingCmds = await storage.getPendingCommands(sn);
       const hasInfoCmd = existingCmds.some(c => c.command === "INFO");
       if (!hasInfoCmd) {
-        await storage.createCommand({
-          deviceSerial: sn,
-          commandType: "INFO",
-          command: "INFO",
-        });
+        const cmdId = `CMD_${Date.now()}_auto_info`;
+        await storage.createCommand(sn, cmdId, "INFO");
         log(`[PUSH] Auto-queued INFO command for device ${sn} to detect model`, "zkteco");
       }
     }
