@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertScheduledTaskSchema, type ScheduledTask, type InsertScheduledTask, type Device } from "@shared/schema";
+import { insertScheduledTaskSchema, type ScheduledTask, type InsertScheduledTask, type Device, type Client } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, CalendarClock, Pencil, Trash2, Clock, Play, Pause, RotateCcw, Info, ClipboardCheck, FileText, Trash, Settings, CalendarSearch, UserPlus, UserMinus, DoorOpen, ImageMinus, BellOff, RefreshCw, Camera, Fingerprint, ScanLine, Lock, MessageSquare, Image, Download, Upload, Terminal, Search } from "lucide-react";
@@ -251,9 +251,21 @@ export default function Tasks() {
     }
   }
 
+  const { data: clientsList } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  function deviceLabel(d: Device): string {
+    const client = clientsList?.find(c => c.id === d.clientId);
+    const clientName = client?.name || "";
+    const alias = d.alias || d.serialNumber;
+    return clientName ? `${clientName} - ${alias} (${d.serialNumber})` : `${alias} (${d.serialNumber})`;
+  }
+
   function getDeviceAlias(serial: string) {
     const device = devices?.find(d => d.serialNumber === serial);
-    return device?.alias || serial;
+    if (!device) return serial;
+    return deviceLabel(device);
   }
 
   function needsParams(cmd: string) {
@@ -335,7 +347,7 @@ export default function Tasks() {
                       <SelectContent>
                         {devices?.map((device) => (
                           <SelectItem key={device.id} value={device.serialNumber}>
-                            {device.alias || device.serialNumber} ({device.serialNumber})
+                            {deviceLabel(device)}
                           </SelectItem>
                         ))}
                       </SelectContent>
