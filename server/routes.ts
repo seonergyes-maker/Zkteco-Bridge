@@ -243,7 +243,7 @@ export async function registerRoutes(
     res.send("OK\n");
   });
 
-  // Device requests commands
+  // Device requests commands (ping every ~30s)
   app.get("/iclock/getrequest", async (req: Request, res: Response) => {
     const sn = req.query.SN as string;
 
@@ -252,7 +252,8 @@ export async function registerRoutes(
       return;
     }
 
-    await storage.updateDeviceLastSeen(sn);
+    const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
+    await storage.updateDeviceLastSeen(sn, ip);
 
     const commands = await storage.getPendingCommands(sn);
 
@@ -270,6 +271,9 @@ export async function registerRoutes(
   // Device returns command results
   app.post("/iclock/devicecmd", async (req: Request, res: Response) => {
     const sn = req.query.SN as string;
+
+    const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
+    if (sn) await storage.updateDeviceLastSeen(sn, ip);
 
     let body = "";
     if (typeof req.body === "string") {
