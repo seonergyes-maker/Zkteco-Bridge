@@ -451,7 +451,19 @@ export default function Commands() {
                 <Separator />
                 <div className="space-y-2">
                   <Label>Nombre de la opcion</Label>
-                  <Select value={optionItem} onValueChange={setOptionItem}>
+                  <Select value={optionItem} onValueChange={(val) => {
+                    setOptionItem(val);
+                    if (val === "MainTime") {
+                      const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Madrid" }));
+                      const y = now.getFullYear();
+                      const m = String(now.getMonth() + 1).padStart(2, "0");
+                      const d = String(now.getDate()).padStart(2, "0");
+                      const hh = String(now.getHours()).padStart(2, "0");
+                      const mm = String(now.getMinutes()).padStart(2, "0");
+                      const ss = String(now.getSeconds()).padStart(2, "0");
+                      setOptionValue(`${y}-${m}-${d} ${hh}:${mm}:${ss}`);
+                    }
+                  }}>
                     <SelectTrigger data-testid="input-option-item">
                       <SelectValue placeholder="Seleccionar opcion" />
                     </SelectTrigger>
@@ -472,6 +484,7 @@ export default function Commands() {
                       </SelectGroup>
                       <SelectGroup>
                         <SelectLabel>Fecha y Hora</SelectLabel>
+                        <SelectItem value="MainTime">MainTime - Sincronizar fecha/hora</SelectItem>
                         <SelectItem value="DtFmt">DtFmt - Formato de fecha (0-10)</SelectItem>
                         <SelectItem value="DSTF">DSTF - Horario de verano (1/0)</SelectItem>
                         <SelectItem value="TimeZone">TimeZone - Zona horaria</SelectItem>
