@@ -23,19 +23,19 @@ function buildCommandString(commandType: string, params?: any): string | null {
       return `SET OPTION ${params.item}=${params.value}`;
     case "QUERY_ATTLOG":
       if (!params?.startTime || !params?.endTime) return null;
-      return `QUERY ATTLOG StartTime=${params.startTime}\tEndTime=${params.endTime}`;
+      return `DATA QUERY ATTLOG StartTime=${params.startTime}\tEndTime=${params.endTime}`;
     case "QUERY_ATTPHOTO":
       if (!params?.startTime || !params?.endTime) return null;
-      return `QUERY ATTPHOTO StartTime=${params.startTime}\tEndTime=${params.endTime}`;
+      return `DATA QUERY ATTPHOTO StartTime=${params.startTime}\tEndTime=${params.endTime}`;
     case "QUERY_USERINFO":
-      return params?.pin ? `QUERY USERINFO PIN=${params.pin}` : `QUERY USERINFO`;
+      return params?.pin ? `DATA QUERY USERINFO PIN=${params.pin}` : `DATA QUERY USERINFO`;
     case "QUERY_FINGERTMP":
       if (params?.pin && params?.fingerId !== undefined) {
-        return `QUERY FINGERTMP PIN=${params.pin}\tFingerID=${params.fingerId}`;
+        return `DATA QUERY FINGERTMP PIN=${params.pin}\tFingerID=${params.fingerId}`;
       } else if (params?.pin) {
-        return `QUERY FINGERTMP PIN=${params.pin}`;
+        return `DATA QUERY FINGERTMP PIN=${params.pin}`;
       }
-      return `QUERY FINGERTMP`;
+      return `DATA QUERY FINGERTMP`;
     case "DATA_USER":
       if (!params?.pin) return null;
       {
