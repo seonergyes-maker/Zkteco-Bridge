@@ -8,7 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Trash2, ArrowDownLeft, ArrowUpRight, ScrollText } from "lucide-react";
 import { useState } from "react";
-import type { Device } from "@shared/schema";
+import type { Device, Client } from "@shared/schema";
 
 interface ProtocolLogEntry {
   id: number;
@@ -42,6 +42,10 @@ export default function Logs() {
     queryKey: ["/api/devices"],
   });
 
+  const { data: clientsList } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
   const clearMutation = useMutation({
     mutationFn: () => apiRequest("DELETE", "/api/protocol-logs"),
     onSuccess: () => {
@@ -50,9 +54,17 @@ export default function Logs() {
     },
   });
 
+  function deviceLabel(d: Device): string {
+    const client = clientsList?.find(c => c.id === d.clientId);
+    const clientName = client?.name || "";
+    const alias = d.alias || d.serialNumber;
+    return clientName ? `${clientName} - ${alias} (${d.serialNumber})` : `${alias} (${d.serialNumber})`;
+  }
+
   function getDeviceAlias(serial: string) {
     const device = devices?.find(d => d.serialNumber === serial);
-    return device?.alias || serial;
+    if (!device) return serial;
+    return deviceLabel(device);
   }
 
   function formatTime(ts: string) {
@@ -77,7 +89,7 @@ export default function Logs() {
               <SelectItem value="all">Todos los dispositivos</SelectItem>
               {devices?.map((d) => (
                 <SelectItem key={d.serialNumber} value={d.serialNumber}>
-                  {d.alias || d.serialNumber}
+                  {deviceLabel(d)}
                 </SelectItem>
               ))}
             </SelectContent>
