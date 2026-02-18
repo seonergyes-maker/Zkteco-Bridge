@@ -16,6 +16,7 @@ interface DashboardStats {
   todayEvents: number;
   pendingForward: number;
   forwardedToday: number;
+  forwardingActive: boolean;
 }
 
 function StatCard({ title, value, subtitle, icon: Icon, variant = "default" }: {
@@ -80,9 +81,9 @@ export default function Dashboard() {
         <p className="text-muted-foreground">Vision general del sistema de fichaje</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${stats?.forwardingActive ? 'xl:grid-cols-6' : 'xl:grid-cols-4'} gap-4`}>
         {statsLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
+          Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
               <CardContent><Skeleton className="h-8 w-16" /></CardContent>
@@ -94,8 +95,12 @@ export default function Dashboard() {
             <StatCard title="Dispositivos" value={stats.totalDevices} icon={Cpu} subtitle="Total registrados" />
             <StatCard title="En linea" value={stats.onlineDevices} icon={CheckCircle} variant="success" subtitle="Ultimos 5 min" />
             <StatCard title="Eventos hoy" value={stats.todayEvents} icon={CalendarClock} subtitle="Fichajes recibidos" />
-            <StatCard title="Pendientes" value={stats.pendingForward} icon={AlertTriangle} variant={stats.pendingForward > 0 ? "warning" : "default"} subtitle="Sin reenviar" />
-            <StatCard title="Reenviados" value={stats.forwardedToday} icon={CheckCircle} variant="success" subtitle="Hoy a Oracle" />
+            {stats.forwardingActive && (
+              <>
+                <StatCard title="Pendientes" value={stats.pendingForward} icon={AlertTriangle} variant={stats.pendingForward > 0 ? "warning" : "default"} subtitle="Sin reenviar" />
+                <StatCard title="Reenviados" value={stats.forwardedToday} icon={CheckCircle} variant="success" subtitle="Hoy a Oracle" />
+              </>
+            )}
           </>
         ) : null}
       </div>
@@ -141,19 +146,21 @@ export default function Dashboard() {
                             <span>{format(new Date(event.timestamp), "dd/MM HH:mm:ss")}</span>
                           </div>
                         </div>
-                        <div>
-                          {event.forwarded ? (
-                            <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Enviado
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pendiente
-                            </Badge>
-                          )}
-                        </div>
+                        {stats?.forwardingActive && (
+                          <div>
+                            {event.forwarded ? (
+                              <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Enviado
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400">
+                                <Clock className="w-3 h-3 mr-1" />
+                                Pendiente
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

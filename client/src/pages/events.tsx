@@ -31,6 +31,8 @@ export default function Events() {
     queryKey: ["/api/clients"],
   });
 
+  const forwardingActive = clientsList?.some(c => c.forwardingEnabled) ?? false;
+
   const { data: devicesList } = useQuery<Device[]>({
     queryKey: ["/api/devices"],
   });
@@ -87,15 +89,17 @@ export default function Events() {
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Eventos de fichaje</h1>
           <p className="text-muted-foreground">Historial de todos los registros recibidos</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => retryMutation.mutate()}
-          disabled={retryMutation.isPending}
-          data-testid="button-retry-forward"
-        >
-          <Send className="w-4 h-4 mr-2" />
-          {retryMutation.isPending ? "Reenviando..." : "Reenviar pendientes"}
-        </Button>
+        {forwardingActive && (
+          <Button
+            variant="outline"
+            onClick={() => retryMutation.mutate()}
+            disabled={retryMutation.isPending}
+            data-testid="button-retry-forward"
+          >
+            <Send className="w-4 h-4 mr-2" />
+            {retryMutation.isPending ? "Reenviando..." : "Reenviar pendientes"}
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
@@ -135,17 +139,19 @@ export default function Events() {
             <SelectItem value="5">Salida H.E.</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={forwardFilter} onValueChange={setForwardFilter}>
-          <SelectTrigger className="w-[160px]" data-testid="select-forward-filter">
-            <SelectValue placeholder="Reenvio" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todo</SelectItem>
-            <SelectItem value="forwarded">Reenviados</SelectItem>
-            <SelectItem value="pending">Pendientes</SelectItem>
-            <SelectItem value="error">Con error</SelectItem>
-          </SelectContent>
-        </Select>
+        {forwardingActive && (
+          <Select value={forwardFilter} onValueChange={setForwardFilter}>
+            <SelectTrigger className="w-[160px]" data-testid="select-forward-filter">
+              <SelectValue placeholder="Reenvio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todo</SelectItem>
+              <SelectItem value="forwarded">Reenviados</SelectItem>
+              <SelectItem value="pending">Pendientes</SelectItem>
+              <SelectItem value="error">Con error</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Button variant="ghost" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/events", clientFilter] })} data-testid="button-refresh-events">
           <RefreshCw className="w-4 h-4" />
         </Button>
@@ -166,7 +172,7 @@ export default function Events() {
                   <TableHead>Estado</TableHead>
                   <TableHead>Verificacion</TableHead>
                   <TableHead>Dispositivo</TableHead>
-                  <TableHead>Reenvio</TableHead>
+                  {forwardingActive && <TableHead>Reenvio</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -195,23 +201,25 @@ export default function Events() {
                         {VERIFY_MODE[event.verify] || "Otro"}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{event.deviceSerial}</TableCell>
-                      <TableCell>
-                        {event.forwarded ? (
-                          <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            OK
-                          </Badge>
-                        ) : event.forwardError ? (
-                          <Badge variant="destructive" className="text-xs">
-                            Error
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400">
-                            <Clock className="w-3 h-3 mr-1" />
-                            Pendiente
-                          </Badge>
-                        )}
-                      </TableCell>
+                      {forwardingActive && (
+                        <TableCell>
+                          {event.forwarded ? (
+                            <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              OK
+                            </Badge>
+                          ) : event.forwardError ? (
+                            <Badge variant="destructive" className="text-xs">
+                              Error
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Pendiente
+                            </Badge>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}

@@ -343,6 +343,8 @@ export class DatabaseStorage implements IStorage {
       and(eq(attendanceEvents.forwarded, true), gte(attendanceEvents.forwardedAt, today))
     );
 
+    const [forwardingEnabledCount] = await db.select({ count: count() }).from(clients).where(eq(clients.forwardingEnabled, true));
+
     return {
       totalClients: clientCount?.count || 0,
       totalDevices: deviceCount?.count || 0,
@@ -350,6 +352,7 @@ export class DatabaseStorage implements IStorage {
       todayEvents: todayCount?.count || 0,
       pendingForward: pendingCount?.count || 0,
       forwardedToday: forwardedCount?.count || 0,
+      forwardingActive: (forwardingEnabledCount?.count || 0) > 0,
     };
   }
 
