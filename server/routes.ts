@@ -702,6 +702,31 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/commands/raw", async (req: Request, res: Response) => {
+    const { deviceSerial, rawCommand } = req.body;
+
+    if (!deviceSerial || !rawCommand) {
+      res.status(400).json({ message: "Falta el dispositivo o el comando" });
+      return;
+    }
+
+    const device = await storage.getDeviceBySerial(deviceSerial);
+    if (!device) {
+      res.status(404).json({ message: "Dispositivo no encontrado" });
+      return;
+    }
+
+    const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    try {
+      const cmd = await storage.createCommand(deviceSerial, cmdId, rawCommand.trim());
+      log(`[CMD] Raw command queued for ${deviceSerial}: ${rawCommand.trim()}`, "commands");
+      res.json(cmd);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Protocol Logs API
   app.get("/api/protocol-logs", async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 200;

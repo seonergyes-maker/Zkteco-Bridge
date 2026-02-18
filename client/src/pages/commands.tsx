@@ -15,7 +15,7 @@ import {
   CalendarSearch, UserPlus, UserMinus, DoorOpen, Terminal, Clock,
   CheckCircle2, XCircle, Loader2, ImageMinus, BellOff, RefreshCw,
   Camera, UserSearch, Fingerprint, ScanLine, Lock, MessageSquare,
-  Image, Download, Upload,
+  Image, Download, Upload, Code,
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -76,6 +76,8 @@ export default function Commands() {
   const [filterDevice, setFilterDevice] = useState<string>("all");
   const { toast } = useToast();
 
+  const [rawCommand, setRawCommand] = useState("");
+  const [rawDevice, setRawDevice] = useState("");
   const [optionItem, setOptionItem] = useState("");
   const [optionValue, setOptionValue] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -147,6 +149,26 @@ export default function Commands() {
       toast({ title: "Error al enviar comando", description: error.message, variant: "destructive" });
     },
   });
+
+  const rawMutation = useMutation({
+    mutationFn: async (data: { deviceSerial: string; rawCommand: string }) => {
+      const res = await apiRequest("POST", "/api/commands/raw", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commands"] });
+      toast({ title: "Comando personalizado enviado", description: "Se ha encolado para el dispositivo." });
+      setRawCommand("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al enviar comando", description: error.message, variant: "destructive" });
+    },
+  });
+
+  function handleSendRaw() {
+    if (!rawDevice || !rawCommand.trim()) return;
+    rawMutation.mutate({ deviceSerial: rawDevice, rawCommand: rawCommand.trim() });
+  }
 
   function resetParams() {
     setOptionItem(""); setOptionValue("");
@@ -385,8 +407,8 @@ export default function Commands() {
         <p className="text-muted-foreground">Envia comandos a los dispositivos ZKTeco</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Terminal className="w-4 h-4" />
@@ -897,7 +919,66 @@ export default function Commands() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Code className="w-4 h-4" />
+              Comando personalizado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Dispositivo</Label>
+              {devicesLoading ? (
+                <Skeleton className="h-9 w-full" />
+              ) : (
+                <Select value={rawDevice} onValueChange={setRawDevice}>
+                  <SelectTrigger data-testid="select-raw-device">
+                    <SelectValue placeholder="Selecciona un dispositivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {devices?.map((d) => (
+                      <SelectItem key={d.serialNumber} value={d.serialNumber}>
+                        {d.alias || d.serialNumber} ({d.serialNumber})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Comando raw</Label>
+              <Input
+                placeholder="Ej: REBOOT, INFO, SET OPTION TimeZone=1"
+                value={rawCommand}
+                onChange={(e) => setRawCommand(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSendRaw(); }}
+                data-testid="input-raw-command"
+              />
+              <p className="text-xs text-muted-foreground">
+                Escribe el comando exacto tal como lo recibiria el dispositivo. Se enviara directamente sin procesar.
+              </p>
+            </div>
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={handleSendRaw}
+              disabled={!rawDevice || !rawCommand.trim() || rawMutation.isPending}
+              data-testid="button-send-raw"
+            >
+              {rawMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              {rawMutation.isPending ? "Enviando..." : "Enviar comando raw"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <CardTitle className="text-base">Historial de comandos</CardTitle>
