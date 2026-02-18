@@ -451,7 +451,73 @@ export default function Commands() {
                 <Separator />
                 <div className="space-y-2">
                   <Label>Nombre de la opcion</Label>
-                  <Input placeholder="Ej: Delay" value={optionItem} onChange={(e) => setOptionItem(e.target.value)} data-testid="input-option-item" />
+                  <Select value={optionItem} onValueChange={setOptionItem}>
+                    <SelectTrigger data-testid="input-option-item">
+                      <SelectValue placeholder="Seleccionar opcion" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Red y Comunicacion</SelectLabel>
+                        <SelectItem value="ServerURL">ServerURL - URL del servidor PUSH</SelectItem>
+                        <SelectItem value="Delay">Delay - Intervalo de ping (seg)</SelectItem>
+                        <SelectItem value="TransInterval">TransInterval - Intervalo de transmision</SelectItem>
+                        <SelectItem value="TransTimes">TransTimes - Hora de transmision</SelectItem>
+                        <SelectItem value="Realtime">Realtime - Envio en tiempo real (1/0)</SelectItem>
+                        <SelectItem value="Encrypt">Encrypt - Encriptar comunicacion (1/0)</SelectItem>
+                        <SelectItem value="IPAddress">IPAddress - Direccion IP</SelectItem>
+                        <SelectItem value="GATEIPAddress">GATEIPAddress - Puerta de enlace</SelectItem>
+                        <SelectItem value="NetMask">NetMask - Mascara de red</SelectItem>
+                        <SelectItem value="DHCP">DHCP - Activar DHCP (1/0)</SelectItem>
+                        <SelectItem value="DNS">DNS - Servidor DNS</SelectItem>
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Fecha y Hora</SelectLabel>
+                        <SelectItem value="DtFmt">DtFmt - Formato de fecha (0-10)</SelectItem>
+                        <SelectItem value="DSTF">DSTF - Horario de verano (1/0)</SelectItem>
+                        <SelectItem value="TimeZone">TimeZone - Zona horaria</SelectItem>
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Pantalla y Sonido</SelectLabel>
+                        <SelectItem value="Language">Language - Idioma (num.)</SelectItem>
+                        <SelectItem value="VOLUME">VOLUME - Volumen (0-100)</SelectItem>
+                        <SelectItem value="Brightness">Brightness - Brillo pantalla</SelectItem>
+                        <SelectItem value="IdleDisplay">IdleDisplay - Mostrar en reposo</SelectItem>
+                        <SelectItem value="VoiceOn">VoiceOn - Voz activada (1/0)</SelectItem>
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Seguridad y Acceso</SelectLabel>
+                        <SelectItem value="LockCount">LockCount - Intentos antes de bloqueo</SelectItem>
+                        <SelectItem value="DoorSensorDelay">DoorSensorDelay - Retardo sensor puerta</SelectItem>
+                        <SelectItem value="DoorAlarmDelay">DoorAlarmDelay - Retardo alarma puerta</SelectItem>
+                        <SelectItem value="AutoOpenDoor">AutoOpenDoor - Apertura automatica (1/0)</SelectItem>
+                        <SelectItem value="DoorCloseDelay">DoorCloseDelay - Retardo cierre puerta</SelectItem>
+                        <SelectItem value="AntiPassback">AntiPassback - Anti-passback (1/0)</SelectItem>
+                        <SelectItem value="InterLock">InterLock - Interlock (1/0)</SelectItem>
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Verificacion</SelectLabel>
+                        <SelectItem value="MThreshold">MThreshold - Umbral 1:N</SelectItem>
+                        <SelectItem value="EThreshold">EThreshold - Umbral 1:1</SelectItem>
+                        <SelectItem value="VThreshold">VThreshold - Umbral verificacion</SelectItem>
+                        <SelectItem value="ShowScore">ShowScore - Mostrar puntuacion (1/0)</SelectItem>
+                        <SelectItem value="UnlockPerson">UnlockPerson - Personas para multi-user (num.)</SelectItem>
+                        <SelectItem value="OnlyPINCard">OnlyPINCard - Solo PIN/tarjeta</SelectItem>
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Registro y Fotos</SelectLabel>
+                        <SelectItem value="PhotoStamp">PhotoStamp - Marca en foto (1/0)</SelectItem>
+                        <SelectItem value="ATTPhotoFunOn">ATTPhotoFunOn - Foto en fichaje (1/0)</SelectItem>
+                        <SelectItem value="MaxAttLogCount">MaxAttLogCount - Max registros fichaje</SelectItem>
+                        <SelectItem value="AutoClearAttLog">AutoClearAttLog - Borrar logs automatico (1/0)</SelectItem>
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Tarjetas</SelectLabel>
+                        <SelectItem value="CardProtFormat">CardProtFormat - Formato lectura tarjeta</SelectItem>
+                        <SelectItem value="WiegandFmt">WiegandFmt - Formato Wiegand</SelectItem>
+                        <SelectItem value="CardBitOrder">CardBitOrder - Orden de bits tarjeta</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Valor</Label>
