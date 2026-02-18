@@ -41,7 +41,7 @@ export default function Devices() {
 
   const form = useForm<InsertDevice>({
     resolver: zodResolver(insertDeviceSchema),
-    defaultValues: { serialNumber: "", clientId: 0, alias: "", model: "", firmwareVersion: "", ipAddress: "", active: true },
+    defaultValues: { serialNumber: "", clientId: 0, alias: "", active: true },
   });
 
   const createMutation = useMutation({
@@ -107,9 +107,6 @@ export default function Devices() {
       serialNumber: device.serialNumber,
       clientId: device.clientId,
       alias: device.alias || "",
-      model: device.model || "",
-      firmwareVersion: device.firmwareVersion || "",
-      ipAddress: device.ipAddress || "",
       active: device.active,
     });
     setOpen(true);
@@ -117,7 +114,7 @@ export default function Devices() {
 
   function openNew() {
     setEditingDevice(null);
-    form.reset({ serialNumber: "", clientId: 0, alias: "", model: "", firmwareVersion: "", ipAddress: "", active: true });
+    form.reset({ serialNumber: "", clientId: 0, alias: "", active: true });
     setOpen(true);
   }
 
@@ -187,26 +184,23 @@ export default function Devices() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="model" render={({ field }) => (
-                    <FormItem>
+                {editingDevice && (editingDevice.model || editingDevice.ipAddress) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
                       <FormLabel>Modelo</FormLabel>
-                      <FormControl>
-                        <Input placeholder="iClock 880" {...field} value={field.value ?? ""} data-testid="input-device-model" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="ipAddress" render={({ field }) => (
-                    <FormItem>
+                      <Input value={editingDevice.model || "-"} disabled className="bg-muted" data-testid="input-device-model" />
+                      <p className="text-xs text-muted-foreground">Auto-detectado</p>
+                    </div>
+                    <div className="space-y-1">
                       <FormLabel>IP</FormLabel>
-                      <FormControl>
-                        <Input placeholder="192.168.1.100" {...field} value={field.value ?? ""} data-testid="input-device-ip" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
+                      <Input value={editingDevice.ipAddress || "-"} disabled className="bg-muted" data-testid="input-device-ip" />
+                      <p className="text-xs text-muted-foreground">Auto-detectada</p>
+                    </div>
+                  </div>
+                )}
+                {!editingDevice && (
+                  <p className="text-xs text-muted-foreground">El modelo y la IP se detectan automaticamente cuando el dispositivo se conecta al servidor.</p>
+                )}
                 <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-device">
                   {(createMutation.isPending || updateMutation.isPending) ? "Guardando..." : editingDevice ? "Actualizar" : "Crear dispositivo"}
                 </Button>

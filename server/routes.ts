@@ -283,6 +283,17 @@ export async function registerRoutes(
 
     if (!device) {
       log(`[PUSH] Unknown device ${sn} - not registered`, "zkteco");
+    } else if (!device.model) {
+      const existingCmds = await storage.getPendingCommands(sn);
+      const hasInfoCmd = existingCmds.some(c => c.command === "INFO");
+      if (!hasInfoCmd) {
+        await storage.createCommand({
+          deviceSerial: sn,
+          commandType: "INFO",
+          command: "INFO",
+        });
+        log(`[PUSH] Auto-queued INFO command for device ${sn} to detect model`, "zkteco");
+      }
     }
 
     const stamps = device || { attlogStamp: "0", operlogStamp: "0", attphotoStamp: "0" };
@@ -479,6 +490,22 @@ export async function registerRoutes(
 
     if (cmdId && returnVal) {
       await storage.updateCommandResult(cmdId, returnVal, cmdData || undefined);
+
+      if (cmdData && sn) {
+        const infoLines = cmdData.split(",");
+        let deviceName = "";
+        let fwVersion = "";
+        for (const line of infoLines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("~DeviceName=")) deviceName = trimmed.split("=")[1]?.trim() || "";
+          if (trimmed.startsWith("DeviceName=")) deviceName = deviceName || trimmed.split("=")[1]?.trim() || "";
+          if (trimmed.startsWith("FWVersion=")) fwVersion = trimmed.split("=")[1]?.trim() || "";
+        }
+        if (deviceName || fwVersion) {
+          await storage.updateDeviceLastSeen(sn, undefined, fwVersion || undefined, deviceName || undefined);
+          log(`[PUSH] Auto-detected device ${sn}: model=${deviceName}, firmware=${fwVersion}`, "zkteco");
+        }
+      }
     }
 
     res.set("Content-Type", "text/plain");

@@ -22,7 +22,7 @@ export interface IStorage {
   getDeviceBySerial(serial: string): Promise<Device | undefined>;
   createDevice(data: InsertDevice): Promise<Device>;
   updateDevice(id: number, data: Partial<InsertDevice>): Promise<Device | undefined>;
-  updateDeviceLastSeen(serial: string, ip?: string, firmware?: string): Promise<void>;
+  updateDeviceLastSeen(serial: string, ip?: string, firmware?: string, model?: string): Promise<void>;
   updateDeviceStamps(serial: string, stamps: { attlogStamp?: string; operlogStamp?: string; attphotoStamp?: string }): Promise<void>;
   deleteDevice(id: number): Promise<void>;
 
@@ -120,10 +120,11 @@ export class DatabaseStorage implements IStorage {
     return device;
   }
 
-  async updateDeviceLastSeen(serial: string, ip?: string, firmware?: string): Promise<void> {
+  async updateDeviceLastSeen(serial: string, ip?: string, firmware?: string, model?: string): Promise<void> {
     const updateData: any = { lastSeen: new Date() };
     if (ip) updateData.ipAddress = ip;
     if (firmware) updateData.firmwareVersion = firmware;
+    if (model) updateData.model = model;
     await db.update(devices).set(updateData).where(eq(devices.serialNumber, serial));
   }
 
