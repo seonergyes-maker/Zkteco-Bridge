@@ -371,6 +371,12 @@ export async function registerRoutes(
             continue;
           }
 
+          const exists = await storage.eventExists(sn, pin, parsedTime);
+          if (exists) {
+            log(`[PUSH] Duplicate event skipped: ${pin} @ ${time} from ${sn}`, "zkteco");
+            continue;
+          }
+
           const event = await storage.createEvent({
             deviceSerial: sn,
             pin,

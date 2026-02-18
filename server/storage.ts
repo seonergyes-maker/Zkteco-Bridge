@@ -31,6 +31,7 @@ export interface IStorage {
   getRecentEvents(limit?: number): Promise<AttendanceEvent[]>;
   getPendingEvents(): Promise<AttendanceEvent[]>;
   getPendingCount(): Promise<number>;
+  eventExists(deviceSerial: string, pin: string, timestamp: Date): Promise<boolean>;
   createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent>;
   markEventForwarded(id: number): Promise<void>;
   markEventForwardError(id: number, error: string): Promise<void>;
@@ -164,14 +165,14 @@ export class DatabaseStorage implements IStorage {
       if (serials.length === 0) return [];
       return db.select().from(attendanceEvents)
         .where(sql`${attendanceEvents.deviceSerial} IN (${sql.join(serials.map(s => sql`${s}`), sql`, `)})`)
-        .orderBy(desc(attendanceEvents.receivedAt))
+        .orderBy(desc(attendanceEvents.timestamp))
         .limit(limit);
     }
-    return db.select().from(attendanceEvents).orderBy(desc(attendanceEvents.receivedAt)).limit(limit);
+    return db.select().from(attendanceEvents).orderBy(desc(attendanceEvents.timestamp)).limit(limit);
   }
 
   async getRecentEvents(limit = 20): Promise<AttendanceEvent[]> {
-    return db.select().from(attendanceEvents).orderBy(desc(attendanceEvents.receivedAt)).limit(limit);
+    return db.select().from(attendanceEvents).orderBy(desc(attendanceEvents.timestamp)).limit(limit);
   }
 
   async getPendingEvents(): Promise<AttendanceEvent[]> {
@@ -181,6 +182,17 @@ export class DatabaseStorage implements IStorage {
   async getPendingCount(): Promise<number> {
     const [result] = await db.select({ count: count() }).from(attendanceEvents).where(eq(attendanceEvents.forwarded, false));
     return result?.count || 0;
+  }
+
+  async eventExists(deviceSerial: string, pin: string, timestamp: Date): Promise<boolean> {
+    const [existing] = await db.select({ id: attendanceEvents.id }).from(attendanceEvents)
+      .where(and(
+        eq(attendanceEvents.deviceSerial, deviceSerial),
+        eq(attendanceEvents.pin, pin),
+        eq(attendanceEvents.timestamp, timestamp)
+      ))
+      .limit(1);
+    return !!existing;
   }
 
   async createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent> {
