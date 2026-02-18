@@ -25,9 +25,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 const PRIVILEGES: Record<number, string> = {
   0: "Usuario normal",
-  2: "Grabador",
-  6: "Administrador",
-  14: "Super Admin",
+  1: "Administrador",
 };
 
 export default function DeviceUsersPage() {
