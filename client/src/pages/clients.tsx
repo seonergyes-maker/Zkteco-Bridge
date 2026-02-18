@@ -33,6 +33,7 @@ export default function Clients() {
     defaultValues: {
       clientId: "", name: "", contactEmail: "", contactPhone: "", active: true,
       oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000,
+      usersApiUrl: "", usersApiKey: "",
     },
   });
 
@@ -45,7 +46,7 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       setOpen(false);
-      form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000 });
+      form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000, usersApiUrl: "", usersApiKey: "" });
       toast({ title: "Cliente creado correctamente" });
     },
     onError: (error: Error) => {
@@ -62,7 +63,7 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       setEditingClient(null);
       setOpen(false);
-      form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000 });
+      form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000, usersApiUrl: "", usersApiKey: "" });
       toast({ title: "Cliente actualizado correctamente" });
     },
     onError: (error: Error) => {
@@ -120,6 +121,8 @@ export default function Clients() {
       forwardingEnabled: client.forwardingEnabled,
       retryAttempts: client.retryAttempts,
       retryDelayMs: client.retryDelayMs,
+      usersApiUrl: client.usersApiUrl || "",
+      usersApiKey: "",
     });
     setOpen(true);
   }
@@ -127,7 +130,7 @@ export default function Clients() {
   function openNew() {
     setEditingClient(null);
     setMaskedApiKey(null);
-    form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000 });
+    form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000, usersApiUrl: "", usersApiKey: "" });
     setOpen(true);
   }
 
@@ -136,6 +139,9 @@ export default function Clients() {
       const updateData = { ...data };
       if (!updateData.oracleApiKey || updateData.oracleApiKey.trim() === "") {
         delete (updateData as any).oracleApiKey;
+      }
+      if (!updateData.usersApiKey || updateData.usersApiKey.trim() === "") {
+        delete (updateData as any).usersApiKey;
       }
       updateMutation.mutate({ id: editingClient.id, data: updateData });
     } else {
@@ -167,6 +173,7 @@ export default function Clients() {
                   <TabsList className="w-full">
                     <TabsTrigger value="general" className="flex-1" data-testid="tab-general">General</TabsTrigger>
                     <TabsTrigger value="oracle" className="flex-1" data-testid="tab-oracle">Reenvio Oracle</TabsTrigger>
+                    <TabsTrigger value="users-api" className="flex-1" data-testid="tab-users-api">API Usuarios</TabsTrigger>
                   </TabsList>
                   <TabsContent value="general" className="space-y-4 mt-4">
                     <FormField control={form.control} name="clientId" render={({ field }) => (
@@ -284,6 +291,41 @@ export default function Clients() {
                         {testMutation.isPending ? "Probando..." : "Probar conexion"}
                       </Button>
                     )}
+                  </TabsContent>
+                  <TabsContent value="users-api" className="space-y-4 mt-4">
+                    <FormField control={form.control} name="usersApiUrl" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>URL de la API de Usuarios</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://tu-api.com/api/usuarios" {...field} value={field.value ?? ""} data-testid="input-users-api-url" />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          Endpoint que devuelve un JSON con los usuarios (array con pin, name, card, privilege)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="usersApiKey" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          API Key (opcional)
+                          <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="tu-api-key"
+                            type="password"
+                            {...field}
+                            value={field.value ?? ""}
+                            data-testid="input-users-api-key"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          Se enviara como Bearer token en la cabecera Authorization
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
                   </TabsContent>
                 </Tabs>
                 <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-client">

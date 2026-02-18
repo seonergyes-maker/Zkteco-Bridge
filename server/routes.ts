@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertClientSchema, insertDeviceSchema, insertScheduledTaskSchema } from "@shared/schema";
+import { insertClientSchema, insertDeviceSchema, insertScheduledTaskSchema, insertDeviceUserSchema } from "@shared/schema";
 import { log } from "./index";
 import { encrypt, decrypt, maskApiKey, isEncrypted } from "./crypto";
 import { addProtocolLog, getProtocolLogs, clearProtocolLogs } from "./protocol-logger";
@@ -191,6 +191,7 @@ function maskClientForResponse(client: any) {
   return {
     ...client,
     oracleApiKey: maskApiKey(client.oracleApiKey),
+    usersApiKey: maskApiKey(client.usersApiKey),
   };
 }
 
@@ -539,6 +540,9 @@ export async function registerRoutes(
       if (data.oracleApiKey) {
         data.oracleApiKey = encrypt(data.oracleApiKey);
       }
+      if (data.usersApiKey) {
+        data.usersApiKey = encrypt(data.usersApiKey);
+      }
       const client = await storage.createClient(data);
       res.json(maskClientForResponse(client));
     } catch (err: any) {
@@ -554,6 +558,13 @@ export async function registerRoutes(
         updateData.oracleApiKey = encrypt(updateData.oracleApiKey);
       } else {
         updateData.oracleApiKey = null;
+      }
+    }
+    if (updateData.usersApiKey !== undefined) {
+      if (updateData.usersApiKey && updateData.usersApiKey.trim() !== "") {
+        updateData.usersApiKey = encrypt(updateData.usersApiKey);
+      } else {
+        updateData.usersApiKey = null;
       }
     }
     const client = await storage.updateClient(id, updateData);
@@ -705,6 +716,154 @@ export async function registerRoutes(
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
+  });
+
+  // Device Users API
+  app.get("/api/device-users", async (req: Request, res: Response) => {
+    const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
+    const users = await storage.getDeviceUsers(clientId);
+    res.json(users);
+  });
+
+  app.post("/api/device-users", async (req: Request, res: Response) => {
+    const parsed = insertDeviceUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: parsed.error.message });
+      return;
+    }
+    try {
+      const user = await storage.createDeviceUser(parsed.data);
+      res.json(user);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/device-users/:id", async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    try {
+      const user = await storage.updateDeviceUser(id, req.body);
+      if (!user) {
+        res.status(404).json({ message: "Usuario no encontrado" });
+        return;
+      }
+      res.json(user);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/device-users/:id", async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    try {
+      await storage.deleteDeviceUser(id);
+      res.json({ message: "Usuario eliminado" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/device-users/client/:clientId", async (req: Request, res: Response) => {
+    const clientId = parseInt(req.params.clientId);
+    try {
+      await storage.clearDeviceUsers(clientId);
+      res.json({ message: "Usuarios del cliente eliminados" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/device-users/sync-from-api", async (req: Request, res: Response) => {
+    const { clientId } = req.body;
+    if (!clientId) {
+      res.status(400).json({ message: "Falta el clientId" });
+      return;
+    }
+
+    const client = await storage.getClient(clientId);
+    if (!client) {
+      res.status(404).json({ message: "Cliente no encontrado" });
+      return;
+    }
+
+    if (!client.usersApiUrl) {
+      res.status(400).json({ message: "El cliente no tiene configurada una API de usuarios" });
+      return;
+    }
+
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (client.usersApiKey) {
+        const apiKey = isEncrypted(client.usersApiKey) ? decrypt(client.usersApiKey) : client.usersApiKey;
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
+
+      const response = await fetch(client.usersApiUrl, { headers });
+      if (!response.ok) {
+        res.status(400).json({ message: `Error de la API: ${response.status} ${response.statusText}` });
+        return;
+      }
+
+      const data = await response.json();
+      const usersArray = Array.isArray(data) ? data : (data.users || data.data || data.results || []);
+
+      if (!Array.isArray(usersArray) || usersArray.length === 0) {
+        res.status(400).json({ message: "La API no devolvio usuarios validos" });
+        return;
+      }
+
+      const mappedUsers = usersArray.map((u: any) => ({
+        clientId,
+        pin: String(u.pin || u.PIN || u.id || u.ID || u.employeeId || ""),
+        name: u.name || u.Name || u.nombre || u.Nombre || null,
+        password: u.password || u.Password || u.passwd || null,
+        card: u.card || u.Card || u.cardno || u.CardNo || null,
+        privilege: parseInt(u.privilege || u.Privilege || "0") || 0,
+      })).filter((u: any) => u.pin);
+
+      const result = await storage.upsertDeviceUsers(clientId, mappedUsers);
+      log(`[USERS] Synced from API for client ${client.name}: ${result.created} created, ${result.updated} updated`, "users");
+      res.json({ message: `Sincronizados ${mappedUsers.length} usuarios: ${result.created} nuevos, ${result.updated} actualizados`, ...result, total: mappedUsers.length });
+    } catch (err: any) {
+      res.status(500).json({ message: `Error al conectar con la API: ${err.message}` });
+    }
+  });
+
+  app.post("/api/device-users/sync-to-device", async (req: Request, res: Response) => {
+    const { userIds, deviceSerial } = req.body;
+
+    if (!deviceSerial || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      res.status(400).json({ message: "Falta el dispositivo o los usuarios" });
+      return;
+    }
+
+    const device = await storage.getDeviceBySerial(deviceSerial);
+    if (!device) {
+      res.status(404).json({ message: "Dispositivo no encontrado" });
+      return;
+    }
+
+    let queued = 0;
+    for (const userId of userIds) {
+      const user = await storage.getDeviceUser(userId);
+      if (!user) continue;
+
+      const parts = [`PIN=${user.pin}`];
+      if (user.name) parts.push(`Name=${user.name}`);
+      if (user.password) parts.push(`Passwd=${user.password}`);
+      if (user.card) parts.push(`Card=${user.card}`);
+      parts.push(`Pri=${user.privilege}`);
+
+      const commandStr = `DATA USER ${parts.join("\t")}`;
+      const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+      await storage.createCommand(deviceSerial, cmdId, commandStr);
+      await storage.updateDeviceUserSyncStatus(userId, deviceSerial);
+      queued++;
+    }
+
+    log(`[USERS] ${queued} users queued for sync to device ${deviceSerial}`, "users");
+    res.json({ message: `${queued} usuario(s) encolados para enviar al dispositivo ${deviceSerial}`, queued });
   });
 
   app.delete("/api/commands", async (_req: Request, res: Response) => {

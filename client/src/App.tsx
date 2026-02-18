@@ -16,6 +16,7 @@ import SettingsPage from "@/pages/settings";
 import Commands from "@/pages/commands";
 import Tasks from "@/pages/tasks";
 import Logs from "@/pages/logs";
+import DeviceUsersPage from "@/pages/users";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/clients" component={Clients} />
       <Route path="/devices" component={Devices} />
+      <Route path="/users" component={DeviceUsersPage} />
       <Route path="/events" component={Events} />
       <Route path="/commands" component={Commands} />
       <Route path="/tasks" component={Tasks} />

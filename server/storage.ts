@@ -1,11 +1,12 @@
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 import {
-  clients, devices, attendanceEvents, operationLogs, deviceCommands, scheduledTasks,
+  clients, devices, attendanceEvents, operationLogs, deviceCommands, scheduledTasks, deviceUsers,
   type Client, type InsertClient,
   type Device, type InsertDevice,
   type AttendanceEvent, type InsertAttendanceEvent,
   type DeviceCommand,
+  type DeviceUser, type InsertDeviceUser,
   type ScheduledTask, type InsertScheduledTask,
 } from "@shared/schema";
 
@@ -41,6 +42,16 @@ export interface IStorage {
   createCommand(serial: string, commandId: string, command: string): Promise<DeviceCommand>;
   updateCommandResult(commandId: string, returnValue: string, returnData?: string): Promise<void>;
   clearCommandHistory(): Promise<void>;
+
+  getDeviceUsers(clientId?: number): Promise<DeviceUser[]>;
+  getDeviceUser(id: number): Promise<DeviceUser | undefined>;
+  getDeviceUserByPin(clientId: number, pin: string): Promise<DeviceUser | undefined>;
+  createDeviceUser(data: InsertDeviceUser): Promise<DeviceUser>;
+  updateDeviceUser(id: number, data: Partial<InsertDeviceUser>): Promise<DeviceUser | undefined>;
+  deleteDeviceUser(id: number): Promise<void>;
+  upsertDeviceUsers(clientId: number, users: InsertDeviceUser[]): Promise<{ created: number; updated: number }>;
+  updateDeviceUserSyncStatus(id: number, deviceSerial: string): Promise<void>;
+  clearDeviceUsers(clientId: number): Promise<void>;
 
   getScheduledTasks(): Promise<ScheduledTask[]>;
   getScheduledTask(id: number): Promise<ScheduledTask | undefined>;
@@ -226,6 +237,72 @@ export class DatabaseStorage implements IStorage {
 
   async clearCommandHistory(): Promise<void> {
     await db.delete(deviceCommands);
+  }
+
+  async getDeviceUsers(clientId?: number): Promise<DeviceUser[]> {
+    if (clientId) {
+      return db.select().from(deviceUsers).where(eq(deviceUsers.clientId, clientId)).orderBy(deviceUsers.pin);
+    }
+    return db.select().from(deviceUsers).orderBy(deviceUsers.pin);
+  }
+
+  async getDeviceUser(id: number): Promise<DeviceUser | undefined> {
+    const [user] = await db.select().from(deviceUsers).where(eq(deviceUsers.id, id));
+    return user;
+  }
+
+  async getDeviceUserByPin(clientId: number, pin: string): Promise<DeviceUser | undefined> {
+    const [user] = await db.select().from(deviceUsers).where(
+      and(eq(deviceUsers.clientId, clientId), eq(deviceUsers.pin, pin))
+    );
+    return user;
+  }
+
+  async createDeviceUser(data: InsertDeviceUser): Promise<DeviceUser> {
+    const result = await db.insert(deviceUsers).values(data);
+    const insertId = Number(result[0].insertId);
+    const [user] = await db.select().from(deviceUsers).where(eq(deviceUsers.id, insertId));
+    return user;
+  }
+
+  async updateDeviceUser(id: number, data: Partial<InsertDeviceUser>): Promise<DeviceUser | undefined> {
+    await db.update(deviceUsers).set({ ...data, updatedAt: new Date() }).where(eq(deviceUsers.id, id));
+    const [user] = await db.select().from(deviceUsers).where(eq(deviceUsers.id, id));
+    return user;
+  }
+
+  async deleteDeviceUser(id: number): Promise<void> {
+    await db.delete(deviceUsers).where(eq(deviceUsers.id, id));
+  }
+
+  async upsertDeviceUsers(clientId: number, users: InsertDeviceUser[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    for (const u of users) {
+      const existing = await this.getDeviceUserByPin(clientId, u.pin);
+      if (existing) {
+        await this.updateDeviceUser(existing.id, { name: u.name, password: u.password, card: u.card, privilege: u.privilege });
+        updated++;
+      } else {
+        await this.createDeviceUser({ ...u, clientId });
+        created++;
+      }
+    }
+    return { created, updated };
+  }
+
+  async updateDeviceUserSyncStatus(id: number, deviceSerial: string): Promise<void> {
+    const user = await this.getDeviceUser(id);
+    if (!user) return;
+    const synced: string[] = user.syncedToDevices ? JSON.parse(user.syncedToDevices) : [];
+    if (!synced.includes(deviceSerial)) {
+      synced.push(deviceSerial);
+    }
+    await db.update(deviceUsers).set({ syncedToDevices: JSON.stringify(synced), updatedAt: new Date() }).where(eq(deviceUsers.id, id));
+  }
+
+  async clearDeviceUsers(clientId: number): Promise<void> {
+    await db.delete(deviceUsers).where(eq(deviceUsers.clientId, clientId));
   }
 
   async getDashboardStats() {

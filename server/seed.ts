@@ -21,6 +21,27 @@ async function ensureTables() {
       next_run_at DATETIME,
       created_at DATETIME NOT NULL DEFAULT NOW()
     )`);
+    const addColumnSafe = async (table: string, column: string, definition: string) => {
+      try {
+        await conn.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      } catch (e: any) {
+        if (!e.message?.includes("Duplicate column")) throw e;
+      }
+    };
+    await addColumnSafe("clients", "users_api_url", "TEXT");
+    await addColumnSafe("clients", "users_api_key", "TEXT");
+    await conn.query(`CREATE TABLE IF NOT EXISTS device_users (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      client_id INT NOT NULL,
+      pin VARCHAR(255) NOT NULL,
+      name TEXT,
+      password TEXT,
+      card TEXT,
+      privilege INT NOT NULL DEFAULT 0,
+      synced_to_devices TEXT,
+      created_at DATETIME NOT NULL DEFAULT NOW(),
+      updated_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
   } finally {
     conn.release();
   }

@@ -15,6 +15,8 @@ export const clients = mysqlTable("clients", {
   forwardingEnabled: boolean("forwarding_enabled").notNull().default(false),
   retryAttempts: int("retry_attempts").notNull().default(3),
   retryDelayMs: int("retry_delay_ms").notNull().default(5000),
+  usersApiUrl: text("users_api_url"),
+  usersApiKey: text("users_api_key"),
   createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
 });
 
@@ -68,6 +70,19 @@ export const deviceCommands = mysqlTable("device_commands", {
   executedAt: datetime("executed_at"),
 });
 
+export const deviceUsers = mysqlTable("device_users", {
+  id: serial("id").primaryKey(),
+  clientId: int("client_id").references(() => clients.id).notNull(),
+  pin: varchar("pin", { length: 255 }).notNull(),
+  name: text("name"),
+  password: text("password"),
+  card: text("card"),
+  privilege: int("privilege").notNull().default(0),
+  syncedToDevices: text("synced_to_devices"),
+  createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
+  updatedAt: datetime("updated_at").default(sql`NOW()`).notNull(),
+});
+
 export const scheduledTasks = mysqlTable("scheduled_tasks", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -88,6 +103,7 @@ export const scheduledTasks = mysqlTable("scheduled_tasks", {
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
 export const insertDeviceSchema = createInsertSchema(devices).omit({ id: true, lastSeen: true, attlogStamp: true, operlogStamp: true, attphotoStamp: true });
 export const insertAttendanceEventSchema = createInsertSchema(attendanceEvents).omit({ id: true, receivedAt: true });
+export const insertDeviceUserSchema = createInsertSchema(deviceUsers).omit({ id: true, createdAt: true, updatedAt: true, syncedToDevices: true });
 export const insertScheduledTaskSchema = createInsertSchema(scheduledTasks).omit({ id: true, createdAt: true, lastRunAt: true, nextRunAt: true }).extend({
   runAt: z.preprocess((val) => {
     if (!val) return undefined;
@@ -105,6 +121,8 @@ export type AttendanceEvent = typeof attendanceEvents.$inferSelect;
 export type InsertAttendanceEvent = z.infer<typeof insertAttendanceEventSchema>;
 export type OperationLog = typeof operationLogs.$inferSelect;
 export type DeviceCommand = typeof deviceCommands.$inferSelect;
+export type DeviceUser = typeof deviceUsers.$inferSelect;
+export type InsertDeviceUser = z.infer<typeof insertDeviceUserSchema>;
 export type ScheduledTask = typeof scheduledTasks.$inferSelect;
 export type InsertScheduledTask = z.infer<typeof insertScheduledTaskSchema>;
 
