@@ -22,12 +22,13 @@ Middleware application that receives push notifications from ZKTeco time clocks 
 ## Project Structure
 ```
 client/src/
-  pages/          - Dashboard, Clients, Devices, Events, Commands, Tasks, Settings
+  pages/          - Dashboard, Clients, Devices, Events, Commands, Tasks, Logs, Settings
   components/     - AppSidebar, ThemeProvider, ThemeToggle, UI components
   lib/            - queryClient (TanStack Query setup)
 server/
   index.ts        - Express server setup
   routes.ts       - ZKTeco PUSH endpoints + REST API routes
+  protocol-logger.ts - In-memory circular buffer for protocol debug logs
   storage.ts      - Database storage layer (IStorage interface)
   db.ts           - MySQL/MariaDB connection with Drizzle
   seed.ts         - Sample data seeding

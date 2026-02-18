@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertClientSchema, insertDeviceSchema, insertScheduledTaskSchema } from "@shared/schema";
 import { log } from "./index";
 import { encrypt, decrypt, maskApiKey, isEncrypted } from "./crypto";
+import { addProtocolLog, getProtocolLogs, clearProtocolLogs } from "./protocol-logger";
 
 function buildCommandString(commandType: string, params?: any): string | null {
   switch (commandType) {
@@ -298,8 +299,13 @@ export async function registerRoutes(
       `ServerVer=2.0.1`,
     ];
 
+    const responseBody = responseLines.join("\n") + "\n";
+
+    addProtocolLog("IN", sn, "/iclock/cdata", "GET", `Registro/config (options=${options})`, `Query: SN=${sn}&options=${options}`, ip);
+    addProtocolLog("OUT", sn, "/iclock/cdata", "GET", `Config enviada al dispositivo`, responseBody, ip);
+
     res.set("Content-Type", "text/plain");
-    res.send(responseLines.join("\n") + "\n");
+    res.send(responseBody);
   });
 
   // Device uploads data (attendance, operation logs, photos)
@@ -326,6 +332,7 @@ export async function registerRoutes(
     }
 
     log(`[PUSH] Device ${sn} uploading ${table} (stamp=${stamp}), body length: ${body.length}`, "zkteco");
+    addProtocolLog("IN", sn, "/iclock/cdata", "POST", `Datos ${table} (stamp=${stamp}, ${body.length} bytes)`, body || "(vacio)", ip);
 
     if (table === "ATTLOG") {
       const lines = body.split("\n").filter(l => l.trim());
@@ -421,6 +428,8 @@ export async function registerRoutes(
     const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
     await storage.updateDeviceLastSeen(sn, ip);
 
+    addProtocolLog("IN", sn, "/iclock/getrequest", "GET", `Polling de comandos`, `Query: SN=${sn}`, ip);
+
     const commands = await storage.getPendingCommands(sn);
 
     if (commands.length === 0) {
@@ -430,8 +439,12 @@ export async function registerRoutes(
     }
 
     const lines = commands.map(cmd => `C:${cmd.commandId}:${cmd.command}`);
+    const responseBody = lines.join("\n") + "\n";
+
+    addProtocolLog("OUT", sn, "/iclock/getrequest", "GET", `${commands.length} comando(s) enviado(s)`, responseBody, ip);
+
     res.set("Content-Type", "text/plain");
-    res.send(lines.join("\n") + "\n");
+    res.send(responseBody);
   });
 
   // Device returns command results
@@ -451,12 +464,13 @@ export async function registerRoutes(
     }
 
     log(`[PUSH] Device ${sn} command result: ${body.substring(0, 200)}`, "zkteco");
+    addProtocolLog("IN", sn || "?", "/iclock/devicecmd", "POST", `Resultado de comando`, body || "(vacio)", ip);
 
     // Parse: ID=iiii&Return=vvvv&CMD=ssss
-    const params = new URLSearchParams(body);
-    const cmdId = params.get("ID");
-    const returnVal = params.get("Return");
-    const cmdData = params.get("CMD");
+    const cmdParams = new URLSearchParams(body);
+    const cmdId = cmdParams.get("ID");
+    const returnVal = cmdParams.get("Return");
+    const cmdData = cmdParams.get("CMD");
 
     if (cmdId && returnVal) {
       await storage.updateCommandResult(cmdId, returnVal, cmdData || undefined);
@@ -657,6 +671,18 @@ export async function registerRoutes(
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
+  });
+
+  // Protocol Logs API
+  app.get("/api/protocol-logs", async (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 200;
+    const device = req.query.device as string | undefined;
+    res.json(getProtocolLogs(limit, device));
+  });
+
+  app.delete("/api/protocol-logs", async (_req: Request, res: Response) => {
+    clearProtocolLogs();
+    res.json({ message: "Logs borrados" });
   });
 
   // Scheduled Tasks API

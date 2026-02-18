@@ -15,6 +15,7 @@ import Events from "@/pages/events";
 import SettingsPage from "@/pages/settings";
 import Commands from "@/pages/commands";
 import Tasks from "@/pages/tasks";
+import Logs from "@/pages/logs";
 
 function Router() {
   return (
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/events" component={Events} />
       <Route path="/commands" component={Commands} />
       <Route path="/tasks" component={Tasks} />
+      <Route path="/logs" component={Logs} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
