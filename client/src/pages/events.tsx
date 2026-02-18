@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarClock, Search, CheckCircle, Clock, Send, RefreshCw, ArrowDownLeft, ArrowUpRight, Building2 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { ATTENDANCE_STATUS, VERIFY_MODE, type AttendanceEvent, type Client, type Device } from "@shared/schema";
+import { ATTENDANCE_STATUS, VERIFY_MODE, type AttendanceEvent, type Client, type Device, type DeviceUser } from "@shared/schema";
 import {
   Table,
   TableBody,
@@ -35,6 +35,10 @@ export default function Events() {
 
   const { data: devicesList } = useQuery<Device[]>({
     queryKey: ["/api/devices"],
+  });
+
+  const { data: deviceUsers } = useQuery<DeviceUser[]>({
+    queryKey: ["/api/device-users"],
   });
 
   const { data: events, isLoading } = useQuery<AttendanceEvent[]>({
@@ -68,6 +72,13 @@ export default function Events() {
     if (!device) return "-";
     const client = clientsList?.find(c => c.id === device.clientId);
     return client?.name || "-";
+  }
+
+  function getUserName(deviceSerial: string, pin: string): string {
+    const device = devicesList?.find(d => d.serialNumber === deviceSerial);
+    if (!device) return "";
+    const user = deviceUsers?.find(u => u.clientId === device.clientId && u.pin === pin);
+    return user?.name || "";
   }
 
   const filtered = events?.filter(e => {
@@ -165,7 +176,7 @@ export default function Events() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tipo</TableHead>
+                  <TableHead>Nombre</TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>PIN</TableHead>
                   <TableHead>Fecha / Hora</TableHead>
@@ -180,12 +191,8 @@ export default function Events() {
                   const isEntry = event.status === 0 || event.status === 3 || event.status === 4;
                   return (
                     <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
-                      <TableCell>
-                        {isEntry ? (
-                          <ArrowDownLeft className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        ) : (
-                          <ArrowUpRight className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                        )}
+                      <TableCell className="text-sm font-medium">
+                        {getUserName(event.deviceSerial, event.pin) || "-"}
                       </TableCell>
                       <TableCell className="text-sm font-medium">{getClientName(event.deviceSerial)}</TableCell>
                       <TableCell className="font-mono font-medium">{event.pin}</TableCell>
