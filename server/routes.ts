@@ -295,6 +295,8 @@ export async function registerRoutes(
       "TransFlag=TransData AttLog\tOpLog\tAttPhoto\tEnrollUser\tChgUser\tEnrollFP\tChgFP",
       `Realtime=1`,
       `Encrypt=0`,
+      `TimeZone=1`,
+      `DSTF=1`,
       `ServerVer=2.0.1`,
     ];
 
