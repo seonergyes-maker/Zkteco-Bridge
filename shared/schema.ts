@@ -140,6 +140,13 @@ export const ATTENDANCE_STATUS: Record<number, string> = {
 export const VERIFY_MODE: Record<number, string> = {
   0: "Contrasena",
   1: "Huella",
-  2: "Tarjeta",
+  2: "Tarjeta RFID",
+  3: "Contrasena + Huella",
+  4: "Tarjeta",
+  5: "Tarjeta + Huella",
+  6: "Tarjeta + Contrasena",
+  7: "Tarjeta + Contrasena + Huella",
+  8: "Tarjeta + Huella + Contrasena",
   9: "Otro",
+  15: "Facial",
 };

@@ -179,10 +179,8 @@ function parseZktecoTimestamp(timeStr: string): Date | null {
   const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
   if (!match) return null;
   const [, year, month, day, hour, min, sec] = match;
-  const d = new Date(
-    parseInt(year), parseInt(month) - 1, parseInt(day),
-    parseInt(hour), parseInt(min), parseInt(sec)
-  );
+  const isoStr = `${year}-${month}-${day}T${hour}:${min}:${sec}.000Z`;
+  const d = new Date(isoStr);
   if (isNaN(d.getTime())) return null;
   return d;
 }

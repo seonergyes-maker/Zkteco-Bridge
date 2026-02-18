@@ -9,6 +9,16 @@ import { ATTENDANCE_STATUS, VERIFY_MODE } from "@shared/schema";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+function formatUTCDate(ts: string | Date): string {
+  const d = new Date(ts);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const hours = String(d.getUTCHours()).padStart(2, "0");
+  const mins = String(d.getUTCMinutes()).padStart(2, "0");
+  const secs = String(d.getUTCSeconds()).padStart(2, "0");
+  return `${day}/${month} ${hours}:${mins}:${secs}`;
+}
+
 interface DashboardStats {
   totalClients: number;
   totalDevices: number;
@@ -143,7 +153,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                             <span>{event.deviceSerial}</span>
                             <span>{VERIFY_MODE[event.verify] || "Otro"}</span>
-                            <span>{format(new Date(event.timestamp), "dd/MM HH:mm:ss")}</span>
+                            <span>{formatUTCDate(event.timestamp)}</span>
                           </div>
                         </div>
                         {stats?.forwardingActive && (

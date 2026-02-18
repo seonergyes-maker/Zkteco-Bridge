@@ -20,6 +20,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+function formatUTCDate(ts: string | Date): string {
+  const d = new Date(ts);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  const hours = String(d.getUTCHours()).padStart(2, "0");
+  const mins = String(d.getUTCMinutes()).padStart(2, "0");
+  const secs = String(d.getUTCSeconds()).padStart(2, "0");
+  return `${day}/${month}/${year} ${hours}:${mins}:${secs}`;
+}
+
 export default function Events() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -197,7 +208,7 @@ export default function Events() {
                       <TableCell className="text-sm font-medium">{getClientName(event.deviceSerial)}</TableCell>
                       <TableCell className="font-mono font-medium">{event.pin}</TableCell>
                       <TableCell className="text-sm">
-                        {format(new Date(event.timestamp), "dd/MM/yyyy HH:mm:ss")}
+                        {formatUTCDate(event.timestamp)}
                       </TableCell>
                       <TableCell>
                         <Badge variant={isEntry ? "default" : "secondary"} className="text-xs">
