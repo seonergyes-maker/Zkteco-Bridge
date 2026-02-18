@@ -30,7 +30,12 @@ function buildCommandString(commandType: string, params?: any): string | null {
     case "QUERY_USERINFO":
       return params?.pin ? `QUERY USERINFO PIN=${params.pin}` : `QUERY USERINFO`;
     case "QUERY_FINGERTMP":
-      return params?.pin ? `QUERY FINGERTMP PIN=${params.pin}` : `QUERY FINGERTMP`;
+      if (params?.pin && params?.fingerId !== undefined) {
+        return `QUERY FINGERTMP PIN=${params.pin}\tFingerID=${params.fingerId}`;
+      } else if (params?.pin) {
+        return `QUERY FINGERTMP PIN=${params.pin}`;
+      }
+      return `QUERY FINGERTMP`;
     case "DATA_USER":
       if (!params?.pin) return null;
       {
