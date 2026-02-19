@@ -213,7 +213,7 @@ export default function Clients() {
               Nuevo cliente
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingClient ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
             </DialogHeader>
@@ -365,11 +365,14 @@ export default function Clients() {
                         <div className="w-20">
                           <label className="text-xs text-muted-foreground">Codigo</label>
                           <Input
-                            type="number"
-                            min={1}
                             placeholder="1"
+                            inputMode="numeric"
                             value={newIncCode}
-                            onChange={(e) => setNewIncCode(e.target.value)}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/[^0-9]/g, "");
+                              setNewIncCode(v);
+                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addIncidence(); } }}
                             data-testid="input-incidence-code"
                           />
                         </div>
@@ -383,7 +386,7 @@ export default function Clients() {
                             data-testid="input-incidence-label"
                           />
                         </div>
-                        <Button type="button" variant="outline" onClick={addIncidence} data-testid="button-add-incidence">
+                        <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addIncidence(); }} data-testid="button-add-incidence">
                           <Plus className="w-4 h-4 mr-1" />
                           Anadir
                         </Button>
