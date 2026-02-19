@@ -92,6 +92,18 @@ export default function Events() {
     return user?.name || "";
   }
 
+  function getIncidenceLabel(deviceSerial: string, workCode: string | null): string | null {
+    if (!workCode || workCode === "0") return null;
+    const device = devicesList?.find(d => d.serialNumber === deviceSerial);
+    if (!device) return `Incidencia ${workCode}`;
+    const client = clientsList?.find(c => c.id === device.clientId);
+    if (!client?.incidenceConfig) return `Incidencia ${workCode}`;
+    try {
+      const config = JSON.parse(client.incidenceConfig);
+      return config[workCode] || `Incidencia ${workCode}`;
+    } catch { return `Incidencia ${workCode}`; }
+  }
+
   const filtered = events?.filter(e => {
     const matchSearch = search === "" ||
       e.pin.toLowerCase().includes(search.toLowerCase()) ||
@@ -192,6 +204,7 @@ export default function Events() {
                   <TableHead>PIN</TableHead>
                   <TableHead>Fecha / Hora</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Incidencia</TableHead>
                   <TableHead>Verificacion</TableHead>
                   <TableHead>Dispositivo</TableHead>
                   {forwardingActive && <TableHead>Reenvio</TableHead>}
@@ -214,6 +227,13 @@ export default function Events() {
                         <Badge variant={isEntry ? "default" : "secondary"} className="text-xs">
                           {ATTENDANCE_STATUS[event.status] || `Estado ${event.status}`}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const label = getIncidenceLabel(event.deviceSerial, event.workCode);
+                          if (!label) return <span className="text-xs text-muted-foreground">-</span>;
+                          return <Badge variant="outline" className="text-xs">{label}</Badge>;
+                        })()}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {VERIFY_MODE[event.verify] || "Otro"}

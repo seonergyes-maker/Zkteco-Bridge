@@ -16,6 +16,7 @@ Middleware application that receives push notifications from ZKTeco time clocks 
 - Device management with real-time online/offline status
 - Device Users management with external API sync and auto-sync to devices
 - Automatic Card replication: when OPERLOG USER data arrives with a Card, updates the user and replicates to all other devices of the same client
+- Configurable incidence codes per client (workCode: 0=normal attendance, 1+=custom incidences with labels)
 - Attendance event reception and storage (deduplication, UTC timestamps)
 - Automatic event forwarding to Oracle API with retry logic
 - Device command system: 31 commands including REBOOT, INFO, CHECK, LOG, CLEAR LOG/DATA/PHOTO, SET OPTION, QUERY ATTLOG/ATTPHOTO/USERINFO/FINGERTMP, DATA USER/DEL_USER/FP/DEL_FP, ENROLL_FP, AC_UNLOCK/UNALARM, RELOAD OPTIONS, UPDATE/DELETE TIMEZONE/GLOCK/SMS/USER_SMS/USERPIC, SHELL, GETFILE, PUTFILE
@@ -77,7 +78,7 @@ shared/
 ## Database Tables
 - `admin_users` - Admin panel users with AES-256 encrypted passwords
 - `access_logs` - Login attempt history with IP, success/fail, reason
-- `clients` - Client registry with custom IDs, per-client Oracle forwarding config
+- `clients` - Client registry with custom IDs, per-client Oracle forwarding config, configurable incidence codes (workCode field: 0=normal, 1+=incidences)
 - `devices` - ZKTeco devices with serial numbers, linked to clients
 - `device_users` - Users to sync to devices, with sync status tracking
 - `attendance_events` - All attendance records with forwarding status

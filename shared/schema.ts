@@ -17,6 +17,7 @@ export const clients = mysqlTable("clients", {
   retryDelayMs: int("retry_delay_ms").notNull().default(5000),
   usersApiUrl: text("users_api_url"),
   usersApiKey: text("users_api_key"),
+  incidenceConfig: text("incidence_config"),
   createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
 });
 

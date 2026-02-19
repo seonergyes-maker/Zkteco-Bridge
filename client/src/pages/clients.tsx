@@ -13,15 +13,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Building2, Search, Pencil, Trash2, Database, Send, Wifi, WifiOff, ShieldCheck } from "lucide-react";
+import { Plus, Building2, Search, Pencil, Trash2, Database, Send, Wifi, WifiOff, ShieldCheck, Tag, X } from "lucide-react";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
+type IncidenceEntry = { code: string; label: string };
 
 export default function Clients() {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [search, setSearch] = useState("");
   const [maskedApiKey, setMaskedApiKey] = useState<string | null>(null);
+  const [incidences, setIncidences] = useState<IncidenceEntry[]>([]);
+  const [newIncCode, setNewIncCode] = useState("");
+  const [newIncLabel, setNewIncLabel] = useState("");
   const { toast } = useToast();
 
   const { data: clients, isLoading } = useQuery<Client[]>({
@@ -107,9 +112,20 @@ export default function Clients() {
     c.clientId.toLowerCase().includes(search.toLowerCase())
   ) ?? [];
 
+  function parseIncidenceConfig(config: string | null): IncidenceEntry[] {
+    if (!config) return [];
+    try {
+      const parsed = JSON.parse(config);
+      return Object.entries(parsed).map(([code, label]) => ({ code, label: label as string }));
+    } catch { return []; }
+  }
+
   function openEdit(client: Client) {
     setEditingClient(client);
     setMaskedApiKey(client.oracleApiKey || null);
+    setIncidences(parseIncidenceConfig(client.incidenceConfig));
+    setNewIncCode("");
+    setNewIncLabel("");
     form.reset({
       clientId: client.clientId,
       name: client.name,
@@ -130,13 +146,47 @@ export default function Clients() {
   function openNew() {
     setEditingClient(null);
     setMaskedApiKey(null);
+    setIncidences([]);
+    setNewIncCode("");
+    setNewIncLabel("");
     form.reset({ clientId: "", name: "", contactEmail: "", contactPhone: "", active: true, oracleApiUrl: "", oracleApiKey: "", forwardingEnabled: false, retryAttempts: 3, retryDelayMs: 5000, usersApiUrl: "", usersApiKey: "" });
     setOpen(true);
   }
 
+  function buildIncidenceConfigJson(): string | null {
+    if (incidences.length === 0) return null;
+    const config: Record<string, string> = {};
+    for (const inc of incidences) {
+      config[inc.code] = inc.label;
+    }
+    return JSON.stringify(config);
+  }
+
+  function addIncidence() {
+    const code = newIncCode.trim();
+    const label = newIncLabel.trim();
+    if (!code || !label) return;
+    if (code === "0") {
+      toast({ title: "El codigo 0 es fichaje normal", variant: "destructive" });
+      return;
+    }
+    if (incidences.some(i => i.code === code)) {
+      toast({ title: "Ese codigo ya existe", variant: "destructive" });
+      return;
+    }
+    setIncidences([...incidences, { code, label }]);
+    setNewIncCode("");
+    setNewIncLabel("");
+  }
+
+  function removeIncidence(code: string) {
+    setIncidences(incidences.filter(i => i.code !== code));
+  }
+
   function onSubmit(data: InsertClient) {
+    const incidenceConfig = buildIncidenceConfigJson();
     if (editingClient) {
-      const updateData = { ...data };
+      const updateData = { ...data, incidenceConfig };
       if (!updateData.oracleApiKey || updateData.oracleApiKey.trim() === "") {
         delete (updateData as any).oracleApiKey;
       }
@@ -145,7 +195,7 @@ export default function Clients() {
       }
       updateMutation.mutate({ id: editingClient.id, data: updateData });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate({ ...data, incidenceConfig });
     }
   }
 
@@ -173,6 +223,7 @@ export default function Clients() {
                   <TabsList className="w-full">
                     <TabsTrigger value="general" className="flex-1" data-testid="tab-general">General</TabsTrigger>
                     <TabsTrigger value="oracle" className="flex-1" data-testid="tab-oracle">Reenvio Oracle</TabsTrigger>
+                    <TabsTrigger value="incidences" className="flex-1" data-testid="tab-incidences">Incidencias</TabsTrigger>
                     <TabsTrigger value="users-api" className="flex-1" data-testid="tab-users-api">API Usuarios</TabsTrigger>
                   </TabsList>
                   <TabsContent value="general" className="space-y-4 mt-4">
@@ -291,6 +342,62 @@ export default function Clients() {
                         {testMutation.isPending ? "Probando..." : "Probar conexion"}
                       </Button>
                     )}
+                  </TabsContent>
+                  <TabsContent value="incidences" className="space-y-4 mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Configura los codigos de incidencia para este cliente. El codigo 0 siempre es fichaje normal.
+                    </p>
+                    <div className="space-y-2">
+                      {incidences.length > 0 && (
+                        <div className="space-y-1">
+                          {incidences.map((inc) => (
+                            <div key={inc.code} className="flex items-center gap-2 rounded-md border p-2" data-testid={`incidence-row-${inc.code}`}>
+                              <Badge variant="secondary" className="font-mono">{inc.code}</Badge>
+                              <span className="flex-1 text-sm">{inc.label}</span>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeIncidence(inc.code)} data-testid={`button-remove-incidence-${inc.code}`}>
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-end gap-2">
+                        <div className="w-20">
+                          <label className="text-xs text-muted-foreground">Codigo</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="1"
+                            value={newIncCode}
+                            onChange={(e) => setNewIncCode(e.target.value)}
+                            data-testid="input-incidence-code"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-xs text-muted-foreground">Descripcion</label>
+                          <Input
+                            placeholder="Ej: Vacaciones, Baja medica..."
+                            value={newIncLabel}
+                            onChange={(e) => setNewIncLabel(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addIncidence(); } }}
+                            data-testid="input-incidence-label"
+                          />
+                        </div>
+                        <Button type="button" variant="outline" onClick={addIncidence} data-testid="button-add-incidence">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Anadir
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="rounded-md border p-3 bg-muted/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Tag className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-medium">Fichaje normal (codigo 0)</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Los fichajes con codigo 0 se consideran entradas/salidas normales. Los codigos 1 en adelante representan las incidencias configuradas arriba.
+                      </p>
+                    </div>
                   </TabsContent>
                   <TabsContent value="users-api" className="space-y-4 mt-4">
                     <FormField control={form.control} name="usersApiUrl" render={({ field }) => (
