@@ -577,12 +577,17 @@ export async function registerRoutes(
               const passwd = fields["Passwd"];
               const pri = fields["Pri"];
 
-              if (pin && card) {
+              if (pin) {
                 const existingUser = await storage.getDeviceUserByPin(device.clientId, pin);
                 if (existingUser) {
-                  if (existingUser.card !== card) {
-                    await storage.updateDeviceUser(existingUser.id, { card });
-                    log(`[OPERLOG] Tarjeta actualizada para usuario PIN=${pin} del cliente ${device.clientId}: Card=${card}`, "users");
+                  const updateFields: Record<string, any> = {};
+                  if (name !== undefined && (name || null) !== (existingUser.name || null)) updateFields.name = name || null;
+                  if (passwd !== undefined && (passwd || null) !== (existingUser.password || null)) updateFields.password = passwd || null;
+                  if (card !== undefined && (card || null) !== (existingUser.card || null)) updateFields.card = card || null;
+                  if (pri !== undefined && parseInt(pri) !== existingUser.privilege) updateFields.privilege = parseInt(pri);
+                  if (Object.keys(updateFields).length > 0) {
+                    await storage.updateDeviceUser(existingUser.id, updateFields);
+                    log(`[OPERLOG] Usuario actualizado PIN=${pin} del cliente ${device.clientId}: ${Object.keys(updateFields).join(", ")}`, "users");
                   }
                 } else {
                   await storage.createDeviceUser({
@@ -590,28 +595,32 @@ export async function registerRoutes(
                     pin,
                     name: name || null,
                     password: passwd || null,
-                    card,
+                    card: card || null,
                     privilege: pri ? parseInt(pri) : 0,
                   });
-                  log(`[OPERLOG] Nuevo usuario creado desde OPERLOG: PIN=${pin}, Card=${card}, cliente ${device.clientId}`, "users");
+                  log(`[OPERLOG] Nuevo usuario creado desde OPERLOG: PIN=${pin}, Name=${name || "-"}, Card=${card || "-"}, cliente ${device.clientId}`, "users");
                 }
 
-                const clientDevices = await storage.getDevicesByClientId(device.clientId);
-                const otherDevices = clientDevices.filter(d => d.serialNumber !== sn && d.active);
+                const oldCard = existingUser?.card || null;
+                const newCard = card !== undefined ? (card || null) : oldCard;
+                if (card !== undefined && newCard !== oldCard) {
+                  const clientDevices = await storage.getDevicesByClientId(device.clientId);
+                  const otherDevices = clientDevices.filter(d => d.serialNumber !== sn && d.active);
 
-                if (otherDevices.length > 0) {
-                  const updatedUser = await storage.getDeviceUserByPin(device.clientId, pin);
-                  if (updatedUser) {
-                    for (const otherDev of otherDevices) {
-                      const parts = [`PIN=${pin}`];
-                      if (updatedUser.name) parts.push(`Name=${updatedUser.name}`);
-                      if (updatedUser.password) parts.push(`Passwd=${updatedUser.password}`);
-                      parts.push(`Card=${card}`);
-                      parts.push(`Pri=${updatedUser.privilege}`);
-                      const commandStr = `DATA USER ${parts.join("\t")}`;
-                      const cmdId = `CARDSYNC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-                      await storage.createCommand(otherDev.serialNumber, cmdId, commandStr);
-                      log(`[CARDSYNC] Replicando tarjeta Card=${card} de PIN=${pin} al dispositivo ${otherDev.serialNumber}`, "users");
+                  if (otherDevices.length > 0) {
+                    const updatedUser = await storage.getDeviceUserByPin(device.clientId, pin);
+                    if (updatedUser) {
+                      for (const otherDev of otherDevices) {
+                        const parts = [`PIN=${pin}`];
+                        if (updatedUser.name) parts.push(`Name=${updatedUser.name}`);
+                        if (updatedUser.password) parts.push(`Passwd=${updatedUser.password}`);
+                        parts.push(`Card=${newCard || ""}`);
+                        parts.push(`Pri=${updatedUser.privilege}`);
+                        const commandStr = `DATA USER ${parts.join("\t")}`;
+                        const cmdId = `CARDSYNC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+                        await storage.createCommand(otherDev.serialNumber, cmdId, commandStr);
+                        log(`[CARDSYNC] Replicando Card=${newCard || "(vacia)"} de PIN=${pin} al dispositivo ${otherDev.serialNumber}`, "users");
+                      }
                     }
                   }
                 }
@@ -847,6 +856,26 @@ export async function registerRoutes(
     const id = parseInt(req.params.id);
     await storage.deleteDevice(id);
     res.json({ success: true });
+  });
+
+  app.post("/api/devices/:id/recover-users", async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const device = await storage.getDevice(id);
+    if (!device) {
+      res.status(404).json({ message: "Dispositivo no encontrado" });
+      return;
+    }
+
+    const cmdId = `RECOVER_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const commandStr = "DATA QUERY USERINFO";
+
+    try {
+      const cmd = await storage.createCommand(device.serialNumber, cmdId, commandStr);
+      log(`[CMD] Recuperar usuarios enviado a ${device.serialNumber} (${device.alias || "sin alias"})`, "commands");
+      res.json({ success: true, command: cmd });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // Events

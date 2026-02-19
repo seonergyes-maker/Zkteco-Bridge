@@ -12,7 +12,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertDeviceSchema, type Device, type InsertDevice, type Client } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Cpu, Search, Pencil, Trash2, Wifi, WifiOff } from "lucide-react";
+import { Plus, Cpu, Search, Pencil, Trash2, Wifi, WifiOff, Users } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -89,6 +90,19 @@ export default function Devices() {
     },
     onError: (error: Error) => {
       toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const recoverUsersMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/devices/${id}/recover-users`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Comando enviado", description: "Se ha solicitado la lista de usuarios al dispositivo. Los usuarios se guardaran cuando el dispositivo responda." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al recuperar usuarios", description: error.message, variant: "destructive" });
     },
   });
 
@@ -266,6 +280,20 @@ export default function Devices() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => recoverUsersMutation.mutate(device.id)}
+                                disabled={recoverUsersMutation.isPending}
+                                data-testid={`button-recover-users-${device.id}`}
+                              >
+                                <Users className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Recuperar usuarios del dispositivo</TooltipContent>
+                          </Tooltip>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(device)} data-testid={`button-edit-device-${device.id}`}>
                             <Pencil className="w-4 h-4" />
                           </Button>
