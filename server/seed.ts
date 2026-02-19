@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { log } from "./index";
 import { pool } from "./db";
+import { encrypt } from "./crypto";
 
 async function ensureTables() {
   const conn = await pool.getConnection();
@@ -42,6 +43,21 @@ async function ensureTables() {
       created_at DATETIME NOT NULL DEFAULT NOW(),
       updated_at DATETIME NOT NULL DEFAULT NOW()
     )`);
+    await conn.query(`CREATE TABLE IF NOT EXISTS admin_users (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(100) NOT NULL UNIQUE,
+      password_encrypted TEXT NOT NULL,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
+    await conn.query(`CREATE TABLE IF NOT EXISTS access_logs (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(100) NOT NULL,
+      ip VARCHAR(45) NOT NULL,
+      success BOOLEAN NOT NULL,
+      reason TEXT,
+      created_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
   } finally {
     conn.release();
   }
@@ -50,6 +66,13 @@ async function ensureTables() {
 export async function seedDatabase() {
   try {
     await ensureTables();
+
+    const existingAdmin = await storage.getAdminUser("admin");
+    if (!existingAdmin) {
+      await storage.createAdminUser("admin", encrypt("admin123"));
+      log("Default admin user created (user: admin, pass: admin123)", "seed");
+    }
+
     const existingClients = await storage.getClients();
     if (existingClients.length > 0) {
       log("Database already has data, skipping seed", "seed");

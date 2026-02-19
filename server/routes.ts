@@ -1,10 +1,18 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import session from "express-session";
 import { storage } from "./storage";
 import { insertClientSchema, insertDeviceSchema, insertScheduledTaskSchema, insertDeviceUserSchema } from "@shared/schema";
 import { log } from "./index";
 import { encrypt, decrypt, maskApiKey, isEncrypted } from "./crypto";
 import { addProtocolLog, getProtocolLogs, clearProtocolLogs } from "./protocol-logger";
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: number;
+    username?: string;
+  }
+}
 
 function buildCommandString(commandType: string, params?: any): string | null {
   switch (commandType) {
@@ -246,6 +254,138 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Session setup
+  app.use(session({
+    secret: process.env.SESSION_SECRET || "fallback-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false,
+      httpOnly: true,
+      maxAge: 8 * 60 * 60 * 1000,
+    },
+  }));
+
+  function requireAuth(req: Request, res: Response, next: NextFunction) {
+    if (req.session.userId) {
+      next();
+    } else {
+      res.status(401).json({ message: "No autenticado" });
+    }
+  }
+
+  function getClientIp(req: Request): string {
+    return (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "127.0.0.1").split(",")[0].trim();
+  }
+
+  // ===== Auth Routes =====
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      res.status(400).json({ message: "Usuario y contrasena requeridos" });
+      return;
+    }
+
+    const ip = getClientIp(req);
+
+    const failedByUser = await storage.getRecentFailedAttempts(username, 30);
+    if (failedByUser.length > 0) {
+      const lastFail = new Date(failedByUser[0].createdAt);
+      const unbanAt = new Date(lastFail.getTime() + 30 * 60 * 1000);
+      const remaining = Math.ceil((unbanAt.getTime() - Date.now()) / 60000);
+      await storage.createAccessLog(username, ip, false, "Cuenta bloqueada temporalmente");
+      log(`[Auth] Login blocked for ${username} - banned for ${remaining} more min`, "auth");
+      res.status(429).json({ message: `Cuenta bloqueada. Intente de nuevo en ${remaining} minutos.` });
+      return;
+    }
+
+    const failedByIp = await storage.getRecentFailedAttemptsByIp(ip, 30);
+    if (failedByIp.length >= 5) {
+      await storage.createAccessLog(username, ip, false, "IP bloqueada por multiples intentos");
+      log(`[Auth] Login blocked for IP ${ip} - too many failed attempts`, "auth");
+      res.status(429).json({ message: "Demasiados intentos fallidos desde esta IP. Intente mas tarde." });
+      return;
+    }
+
+    const user = await storage.getAdminUser(username);
+    if (!user || !user.active) {
+      await storage.createAccessLog(username, ip, false, "Usuario no encontrado");
+      log(`[Auth] Failed login: unknown user "${username}" from ${ip}`, "auth");
+      res.status(401).json({ message: "Credenciales incorrectas" });
+      return;
+    }
+
+    const decryptedPassword = decrypt(user.passwordEncrypted);
+    if (decryptedPassword !== password) {
+      await storage.createAccessLog(username, ip, false, "Contrasena incorrecta");
+      log(`[Auth] Failed login: wrong password for "${username}" from ${ip}`, "auth");
+      res.status(401).json({ message: "Credenciales incorrectas" });
+      return;
+    }
+
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    await storage.createAccessLog(username, ip, true, "Login exitoso");
+    log(`[Auth] Successful login: "${username}" from ${ip}`, "auth");
+    res.json({ username: user.username, id: user.id });
+  });
+
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    const username = req.session.username;
+    req.session.destroy(() => {
+      log(`[Auth] Logout: "${username}"`, "auth");
+      res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/session", async (req: Request, res: Response) => {
+    if (req.session.userId) {
+      const user = await storage.getAdminUserById(req.session.userId);
+      if (user && user.active) {
+        res.json({ authenticated: true, username: user.username, id: user.id });
+        return;
+      }
+    }
+    res.json({ authenticated: false });
+  });
+
+  app.get("/api/auth/access-logs", requireAuth, async (_req: Request, res: Response) => {
+    const logs = await storage.getAccessLogs(200);
+    res.json(logs);
+  });
+
+  app.post("/api/auth/change-password", requireAuth, async (req: Request, res: Response) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ message: "Contrasena actual y nueva requeridas" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      res.status(400).json({ message: "La nueva contrasena debe tener al menos 6 caracteres" });
+      return;
+    }
+    const user = await storage.getAdminUserById(req.session.userId!);
+    if (!user) {
+      res.status(404).json({ message: "Usuario no encontrado" });
+      return;
+    }
+    const decrypted = decrypt(user.passwordEncrypted);
+    if (decrypted !== currentPassword) {
+      res.status(401).json({ message: "Contrasena actual incorrecta" });
+      return;
+    }
+    await storage.updateAdminPassword(user.id, encrypt(newPassword));
+    log(`[Auth] Password changed for "${user.username}"`, "auth");
+    res.json({ success: true });
+  });
+
+  // Protect all /api/ routes except auth and ZKTeco PUSH endpoints
+  app.use("/api", (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith("/auth/")) return next();
+    if (req.session.userId) return next();
+    res.status(401).json({ message: "No autenticado" });
+  });
 
   // Encrypt any existing plaintext API keys on startup
   try {

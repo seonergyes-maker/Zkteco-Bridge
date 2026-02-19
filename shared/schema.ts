@@ -126,6 +126,28 @@ export type InsertDeviceUser = z.infer<typeof insertDeviceUserSchema>;
 export type ScheduledTask = typeof scheduledTasks.$inferSelect;
 export type InsertScheduledTask = z.infer<typeof insertScheduledTaskSchema>;
 
+export const adminUsers = mysqlTable("admin_users", {
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 100 }).notNull().unique(),
+  passwordEncrypted: text("password_encrypted").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
+});
+
+export const accessLogs = mysqlTable("access_logs", {
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 100 }).notNull(),
+  ip: varchar("ip", { length: 45 }).notNull(),
+  success: boolean("success").notNull(),
+  reason: text("reason"),
+  createdAt: datetime("created_at").default(sql`NOW()`).notNull(),
+});
+
+export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({ id: true, createdAt: true });
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+export type AccessLog = typeof accessLogs.$inferSelect;
+
 export const ATTENDANCE_STATUS: Record<number, string> = {
   0: "Entrada",
   1: "Salida",

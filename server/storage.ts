@@ -2,12 +2,14 @@ import { db } from "./db";
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 import {
   clients, devices, attendanceEvents, operationLogs, deviceCommands, scheduledTasks, deviceUsers,
+  adminUsers, accessLogs,
   type Client, type InsertClient,
   type Device, type InsertDevice,
   type AttendanceEvent, type InsertAttendanceEvent,
   type DeviceCommand,
   type DeviceUser, type InsertDeviceUser,
   type ScheduledTask, type InsertScheduledTask,
+  type AdminUser, type AccessLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -71,6 +73,17 @@ export interface IStorage {
     pendingForward: number;
     forwardedToday: number;
   }>;
+
+  getAdminUser(username: string): Promise<AdminUser | undefined>;
+  getAdminUserById(id: number): Promise<AdminUser | undefined>;
+  createAdminUser(username: string, passwordEncrypted: string): Promise<AdminUser>;
+  updateAdminPassword(id: number, passwordEncrypted: string): Promise<void>;
+  getAdminUsers(): Promise<AdminUser[]>;
+
+  createAccessLog(username: string, ip: string, success: boolean, reason?: string): Promise<void>;
+  getAccessLogs(limit?: number): Promise<AccessLog[]>;
+  getRecentFailedAttempts(username: string, sinceMinutes: number): Promise<AccessLog[]>;
+  getRecentFailedAttemptsByIp(ip: string, sinceMinutes: number): Promise<AccessLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -400,6 +413,61 @@ export class DatabaseStorage implements IStorage {
       data.enabled = false;
     }
     await db.update(scheduledTasks).set(data).where(eq(scheduledTasks.id, id));
+  }
+
+  async getAdminUser(username: string): Promise<AdminUser | undefined> {
+    const [user] = await db.select().from(adminUsers).where(eq(adminUsers.username, username));
+    return user;
+  }
+
+  async getAdminUserById(id: number): Promise<AdminUser | undefined> {
+    const [user] = await db.select().from(adminUsers).where(eq(adminUsers.id, id));
+    return user;
+  }
+
+  async createAdminUser(username: string, passwordEncrypted: string): Promise<AdminUser> {
+    const result = await db.insert(adminUsers).values({ username, passwordEncrypted });
+    const insertId = result[0].insertId;
+    const [user] = await db.select().from(adminUsers).where(eq(adminUsers.id, insertId));
+    return user;
+  }
+
+  async updateAdminPassword(id: number, passwordEncrypted: string): Promise<void> {
+    await db.update(adminUsers).set({ passwordEncrypted }).where(eq(adminUsers.id, id));
+  }
+
+  async getAdminUsers(): Promise<AdminUser[]> {
+    return db.select().from(adminUsers).orderBy(adminUsers.username);
+  }
+
+  async createAccessLog(username: string, ip: string, success: boolean, reason?: string): Promise<void> {
+    await db.insert(accessLogs).values({ username, ip, success, reason: reason || null });
+  }
+
+  async getAccessLogs(limit = 100): Promise<AccessLog[]> {
+    return db.select().from(accessLogs).orderBy(desc(accessLogs.createdAt)).limit(limit);
+  }
+
+  async getRecentFailedAttempts(username: string, sinceMinutes: number): Promise<AccessLog[]> {
+    const since = new Date(Date.now() - sinceMinutes * 60 * 1000);
+    return db.select().from(accessLogs).where(
+      and(
+        eq(accessLogs.username, username),
+        eq(accessLogs.success, false),
+        gte(accessLogs.createdAt, since)
+      )
+    ).orderBy(desc(accessLogs.createdAt));
+  }
+
+  async getRecentFailedAttemptsByIp(ip: string, sinceMinutes: number): Promise<AccessLog[]> {
+    const since = new Date(Date.now() - sinceMinutes * 60 * 1000);
+    return db.select().from(accessLogs).where(
+      and(
+        eq(accessLogs.ip, ip),
+        eq(accessLogs.success, false),
+        gte(accessLogs.createdAt, since)
+      )
+    ).orderBy(desc(accessLogs.createdAt));
   }
 }
 
