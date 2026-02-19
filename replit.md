@@ -15,6 +15,7 @@ Middleware application that receives push notifications from ZKTeco time clocks 
 - Client management (CRUD) with multiple devices per client
 - Device management with real-time online/offline status
 - Device Users management with external API sync and auto-sync to devices
+- Automatic Card replication: when OPERLOG USER data arrives with a Card, updates the user and replicates to all other devices of the same client
 - Attendance event reception and storage (deduplication, UTC timestamps)
 - Automatic event forwarding to Oracle API with retry logic
 - Device command system: 31 commands including REBOOT, INFO, CHECK, LOG, CLEAR LOG/DATA/PHOTO, SET OPTION, QUERY ATTLOG/ATTPHOTO/USERINFO/FINGERTMP, DATA USER/DEL_USER/FP/DEL_FP, ENROLL_FP, AC_UNLOCK/UNALARM, RELOAD OPTIONS, UPDATE/DELETE TIMEZONE/GLOCK/SMS/USER_SMS/USERPIC, SHELL, GETFILE, PUTFILE

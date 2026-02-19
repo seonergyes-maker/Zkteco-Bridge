@@ -556,6 +556,71 @@ export async function registerRoutes(
         else if (trimmed.startsWith("OPLOG")) logType = "OPLOG";
 
         await storage.createOperationLog(sn, logType, trimmed);
+
+        if (logType === "USER") {
+          try {
+            const device = await storage.getDeviceBySerial(sn);
+            if (device) {
+              const fields: Record<string, string> = {};
+              const fieldPart = trimmed.replace(/^USER\s+/, "");
+              const pairs = fieldPart.split("\t");
+              for (const pair of pairs) {
+                const eqIdx = pair.indexOf("=");
+                if (eqIdx > 0) {
+                  fields[pair.substring(0, eqIdx).trim()] = pair.substring(eqIdx + 1).trim();
+                }
+              }
+
+              const pin = fields["PIN"];
+              const card = fields["Card"];
+              const name = fields["Name"];
+              const passwd = fields["Passwd"];
+              const pri = fields["Pri"];
+
+              if (pin && card) {
+                const existingUser = await storage.getDeviceUserByPin(device.clientId, pin);
+                if (existingUser) {
+                  if (existingUser.card !== card) {
+                    await storage.updateDeviceUser(existingUser.id, { card });
+                    log(`[OPERLOG] Tarjeta actualizada para usuario PIN=${pin} del cliente ${device.clientId}: Card=${card}`, "users");
+                  }
+                } else {
+                  await storage.createDeviceUser({
+                    clientId: device.clientId,
+                    pin,
+                    name: name || null,
+                    password: passwd || null,
+                    card,
+                    privilege: pri ? parseInt(pri) : 0,
+                  });
+                  log(`[OPERLOG] Nuevo usuario creado desde OPERLOG: PIN=${pin}, Card=${card}, cliente ${device.clientId}`, "users");
+                }
+
+                const clientDevices = await storage.getDevicesByClientId(device.clientId);
+                const otherDevices = clientDevices.filter(d => d.serialNumber !== sn && d.active);
+
+                if (otherDevices.length > 0) {
+                  const updatedUser = await storage.getDeviceUserByPin(device.clientId, pin);
+                  if (updatedUser) {
+                    for (const otherDev of otherDevices) {
+                      const parts = [`PIN=${pin}`];
+                      if (updatedUser.name) parts.push(`Name=${updatedUser.name}`);
+                      if (updatedUser.password) parts.push(`Passwd=${updatedUser.password}`);
+                      parts.push(`Card=${card}`);
+                      parts.push(`Pri=${updatedUser.privilege}`);
+                      const commandStr = `DATA USER ${parts.join("\t")}`;
+                      const cmdId = `CARDSYNC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+                      await storage.createCommand(otherDev.serialNumber, cmdId, commandStr);
+                      log(`[CARDSYNC] Replicando tarjeta Card=${card} de PIN=${pin} al dispositivo ${otherDev.serialNumber}`, "users");
+                    }
+                  }
+                }
+              }
+            }
+          } catch (err: any) {
+            log(`[OPERLOG] Error procesando USER: ${err.message}`, "error");
+          }
+        }
       }
 
       if (stamp) {

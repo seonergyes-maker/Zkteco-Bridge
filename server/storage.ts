@@ -21,6 +21,7 @@ export interface IStorage {
   deleteClient(id: number): Promise<void>;
 
   getDevices(): Promise<Device[]>;
+  getDevicesByClientId(clientId: number): Promise<Device[]>;
   getDevice(id: number): Promise<Device | undefined>;
   getDeviceBySerial(serial: string): Promise<Device | undefined>;
   createDevice(data: InsertDevice): Promise<Device>;
@@ -122,6 +123,10 @@ export class DatabaseStorage implements IStorage {
 
   async getDevices(): Promise<Device[]> {
     return db.select().from(devices).orderBy(devices.serialNumber);
+  }
+
+  async getDevicesByClientId(clientId: number): Promise<Device[]> {
+    return db.select().from(devices).where(eq(devices.clientId, clientId)).orderBy(devices.serialNumber);
   }
 
   async getDevice(id: number): Promise<Device | undefined> {
