@@ -73,6 +73,12 @@ export async function seedDatabase() {
       log("Default admin user created (user: admin, pass: admin123)", "seed");
     }
 
+    const existingEnrique = await storage.getAdminUser("enrique@daemon4.com");
+    if (!existingEnrique) {
+      await storage.createAdminUser("enrique@daemon4.com", encrypt("Daemon4$"));
+      log("Admin user enrique@daemon4.com created", "seed");
+    }
+
     const existingClients = await storage.getClients();
     if (existingClients.length > 0) {
       log("Database already has data, skipping seed", "seed");

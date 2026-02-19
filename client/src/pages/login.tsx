@@ -30,7 +30,20 @@ export default function Login({ onLogin }: LoginProps) {
       toast({ title: "Sesion iniciada correctamente" });
       onLogin();
     } catch (err: any) {
-      const msg = err.message || "Error al iniciar sesion";
+      let msg = "Error al iniciar sesion";
+      if (err.message) {
+        const jsonMatch = err.message.match(/\{.*\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            msg = parsed.message || msg;
+          } catch {
+            msg = err.message;
+          }
+        } else {
+          msg = err.message;
+        }
+      }
       setError(msg);
     } finally {
       setLoading(false);
