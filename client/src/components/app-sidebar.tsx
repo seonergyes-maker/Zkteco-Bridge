@@ -44,7 +44,7 @@ export function AppSidebar() {
             <Activity className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold tracking-tight">ZKTeco Hub</h2>
+            <h2 className="text-sm font-semibold tracking-tight">DCrono Hub</h2>
             <p className="text-xs text-muted-foreground">PUSH SDK v2.0.1</p>
           </div>
         </div>

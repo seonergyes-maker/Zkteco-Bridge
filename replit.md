@@ -1,4 +1,4 @@
-# ZKTeco Hub - Middleware de Fichaje
+# DCrono Hub - Middleware de Fichaje
 
 ## Overview
 Middleware application that receives push notifications from ZKTeco time clocks via the PUSH SDK 2.0.1 protocol. Acts as an intermediary between ZKTeco devices and an Oracle database, forwarding attendance events via API.

@@ -59,7 +59,7 @@ export default function Login({ onLogin }: LoginProps) {
               <Lock className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-xl">ZKTeco Hub</CardTitle>
+          <CardTitle className="text-xl">DCrono Hub</CardTitle>
           <p className="text-sm text-muted-foreground">Acceso al panel de administracion</p>
         </CardHeader>
         <CardContent>
