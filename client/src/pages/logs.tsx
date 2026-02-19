@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Trash2, ArrowDownLeft, ArrowUpRight, ScrollText } from "lucide-react";
+import { RefreshCw, Trash2, ArrowDownLeft, ArrowUpRight, ScrollText, Filter } from "lucide-react";
 import { useState } from "react";
 import type { Device, Client } from "@shared/schema";
 
@@ -20,16 +20,22 @@ interface ProtocolLogEntry {
   summary: string;
   details: string;
   ip: string;
+  logType: string;
 }
 
 export default function Logs() {
   const { toast } = useToast();
   const [deviceFilter, setDeviceFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const logsUrl = deviceFilter === "all" ? "/api/protocol-logs?limit=200" : `/api/protocol-logs?limit=200&device=${deviceFilter}`;
+  const params = new URLSearchParams({ limit: "200" });
+  if (deviceFilter !== "all") params.set("device", deviceFilter);
+  if (typeFilter !== "all") params.set("type", typeFilter);
+  const logsUrl = `/api/protocol-logs?${params.toString()}`;
+
   const { data: logs, isLoading } = useQuery<ProtocolLogEntry[]>({
-    queryKey: ["/api/protocol-logs", deviceFilter],
+    queryKey: ["/api/protocol-logs", deviceFilter, typeFilter],
     queryFn: async () => {
       const res = await fetch(logsUrl, { credentials: "include" });
       if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
@@ -44,6 +50,11 @@ export default function Logs() {
 
   const { data: clientsList } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+  });
+
+  const { data: logTypes } = useQuery<string[]>({
+    queryKey: ["/api/protocol-log-types"],
+    refetchInterval: 5000,
   });
 
   const clearMutation = useMutation({
@@ -91,6 +102,18 @@ export default function Logs() {
                 <SelectItem key={d.serialNumber} value={d.serialNumber}>
                   {deviceLabel(d)}
                 </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[180px]" data-testid="select-type-filter">
+              <Filter className="w-4 h-4 mr-2 shrink-0" />
+              <SelectValue placeholder="Todos los tipos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              {logTypes?.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -144,7 +167,7 @@ export default function Logs() {
                     </Badge>
                   )}
                   <Badge variant="outline" className="font-mono text-xs shrink-0">
-                    {entry.method}
+                    {entry.logType || entry.method}
                   </Badge>
                   <span className="text-xs font-mono text-muted-foreground shrink-0">
                     {entry.endpoint}

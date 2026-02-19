@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { insertClientSchema, insertDeviceSchema, insertScheduledTaskSchema, insertDeviceUserSchema } from "@shared/schema";
 import { log } from "./index";
 import { encrypt, decrypt, maskApiKey, isEncrypted } from "./crypto";
-import { addProtocolLog, getProtocolLogs, clearProtocolLogs } from "./protocol-logger";
+import { addProtocolLog, getProtocolLogs, clearProtocolLogs, getLogTypes } from "./protocol-logger";
 
 declare module "express-session" {
   interface SessionData {
@@ -453,8 +453,8 @@ export async function registerRoutes(
 
     const responseBody = responseLines.join("\n") + "\n";
 
-    addProtocolLog("IN", sn, "/iclock/cdata", "GET", `Registro/config (options=${options})`, `Query: SN=${sn}&options=${options}`, ip);
-    addProtocolLog("OUT", sn, "/iclock/cdata", "GET", `Config enviada al dispositivo`, responseBody, ip);
+    addProtocolLog("IN", sn, "/iclock/cdata", "GET", `Registro/config (options=${options})`, `Query: SN=${sn}&options=${options}`, ip, "CONFIG");
+    addProtocolLog("OUT", sn, "/iclock/cdata", "GET", `Config enviada al dispositivo`, responseBody, ip, "CONFIG");
 
     res.set("Content-Type", "text/plain");
     res.send(responseBody);
@@ -484,7 +484,7 @@ export async function registerRoutes(
     }
 
     log(`[PUSH] Device ${sn} uploading ${table} (stamp=${stamp}), body length: ${body.length}`, "zkteco");
-    addProtocolLog("IN", sn, "/iclock/cdata", "POST", `Datos ${table} (stamp=${stamp}, ${body.length} bytes)`, body || "(vacio)", ip);
+    addProtocolLog("IN", sn, "/iclock/cdata", "POST", `Datos ${table} (stamp=${stamp}, ${body.length} bytes)`, body || "(vacio)", ip, table || "DATA");
 
     if (table === "ATTLOG") {
       const lines = body.split("\n").filter(l => l.trim());
@@ -651,7 +651,7 @@ export async function registerRoutes(
     const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
     await storage.updateDeviceLastSeen(sn, ip);
 
-    addProtocolLog("IN", sn, "/iclock/getrequest", "GET", `Polling de comandos`, `Query: SN=${sn}`, ip);
+    addProtocolLog("IN", sn, "/iclock/getrequest", "GET", `Polling de comandos`, `Query: SN=${sn}`, ip, "POLLING");
 
     const device = await storage.getDeviceBySerial(sn);
     if (device) {
@@ -692,7 +692,7 @@ export async function registerRoutes(
     });
     const responseBody = lines.join("\n") + "\n";
 
-    addProtocolLog("OUT", sn, "/iclock/getrequest", "GET", `${commands.length} comando(s) enviado(s)`, responseBody, ip);
+    addProtocolLog("OUT", sn, "/iclock/getrequest", "GET", `${commands.length} comando(s) enviado(s)`, responseBody, ip, "COMANDOS");
 
     res.set("Content-Type", "text/plain");
     res.send(responseBody);
@@ -715,7 +715,7 @@ export async function registerRoutes(
     }
 
     log(`[PUSH] Device ${sn} command result: ${body.substring(0, 200)}`, "zkteco");
-    addProtocolLog("IN", sn || "?", "/iclock/devicecmd", "POST", `Resultado de comando`, body || "(vacio)", ip);
+    addProtocolLog("IN", sn || "?", "/iclock/devicecmd", "POST", `Resultado de comando`, body || "(vacio)", ip, "COMANDOS");
 
     // Parse: ID=iiii&Return=vvvv&CMD=ssss
     const cmdParams = new URLSearchParams(body);
@@ -1132,7 +1132,12 @@ export async function registerRoutes(
   app.get("/api/protocol-logs", async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 200;
     const device = req.query.device as string | undefined;
-    res.json(getProtocolLogs(limit, device));
+    const type = req.query.type as string | undefined;
+    res.json(getProtocolLogs(limit, device, type));
+  });
+
+  app.get("/api/protocol-log-types", async (_req: Request, res: Response) => {
+    res.json(getLogTypes());
   });
 
   app.delete("/api/protocol-logs", async (_req: Request, res: Response) => {
