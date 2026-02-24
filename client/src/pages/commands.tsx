@@ -640,7 +640,7 @@ export default function Commands() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">Usuario normal</SelectItem>
-                      <SelectItem value="16">Administrador</SelectItem>
+                      <SelectItem value="14">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
