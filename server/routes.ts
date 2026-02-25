@@ -339,7 +339,12 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
-  // Session setup
+  const cookieSecure = process.env.COOKIE_SECURE === "false"
+    ? false
+    : process.env.NODE_ENV === "production";
+
+  log(`[Session] cookie.secure=${cookieSecure}, NODE_ENV=${process.env.NODE_ENV}, trust proxy=${app.get("trust proxy")}`, "auth");
+
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "fallback-secret-key",
@@ -349,7 +354,7 @@ export async function registerRoutes(
       proxy: true,
       name: "dcrono.sid",
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: cookieSecure,
         httpOnly: true,
         sameSite: "lax",
         path: "/",
@@ -357,6 +362,36 @@ export async function registerRoutes(
       },
     }),
   );
+
+  app.get("/api/debug/session", (req: Request, res: Response) => {
+    res.json({
+      protocol: req.protocol,
+      secure: req.secure,
+      headers: {
+        "x-forwarded-proto": req.headers["x-forwarded-proto"] || "NOT SET",
+        "x-forwarded-for": req.headers["x-forwarded-for"] || "NOT SET",
+        host: req.headers.host || "NOT SET",
+        cookie: req.headers.cookie ? "PRESENT (" + req.headers.cookie.length + " chars)" : "NOT SET",
+      },
+      session: {
+        id: req.sessionID,
+        userId: req.session.userId || null,
+        username: req.session.username || null,
+        cookie: req.session.cookie ? {
+          secure: req.session.cookie.secure,
+          httpOnly: req.session.cookie.httpOnly,
+          sameSite: req.session.cookie.sameSite,
+          maxAge: req.session.cookie.maxAge,
+          path: req.session.cookie.path,
+        } : null,
+      },
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        COOKIE_SECURE: process.env.COOKIE_SECURE || "NOT SET",
+        trustProxy: app.get("trust proxy"),
+      },
+    });
+  });
 
   function requireAuth(req: Request, res: Response, next: NextFunction) {
     if (req.session.userId) {
@@ -486,6 +521,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/auth/session", async (req: Request, res: Response) => {
+    log(`[Session Check] sessionID=${req.sessionID}, userId=${req.session.userId || "NONE"}, cookie-header=${req.headers.cookie ? "PRESENT" : "MISSING"}, proto=${req.protocol}, x-fwd-proto=${req.headers["x-forwarded-proto"] || "NONE"}`, "auth");
     if (req.session.userId) {
       const user = await storage.getAdminUserById(req.session.userId);
       if (user && user.active) {
