@@ -909,6 +909,11 @@ export async function registerRoutes(
     res.json({ forwarded, total: pending.length });
   });
 
+  app.delete("/api/events", async (_req: Request, res: Response) => {
+    await storage.deleteAllEvents();
+    res.json({ message: "Todos los eventos de fichaje han sido eliminados" });
+  });
+
   app.post("/api/clients/:id/test-forwarding", async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     const client = await storage.getClient(id);

@@ -38,6 +38,7 @@ export interface IStorage {
   createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent>;
   markEventForwarded(id: number): Promise<void>;
   markEventForwardError(id: number, error: string): Promise<void>;
+  deleteAllEvents(): Promise<void>;
 
   createOperationLog(deviceSerial: string, logType: string, content: string): Promise<void>;
 
@@ -226,6 +227,10 @@ export class DatabaseStorage implements IStorage {
 
   async markEventForwardError(id: number, error: string): Promise<void> {
     await db.update(attendanceEvents).set({ forwardError: error }).where(eq(attendanceEvents.id, id));
+  }
+
+  async deleteAllEvents(): Promise<void> {
+    await db.delete(attendanceEvents);
   }
 
   async createOperationLog(deviceSerial: string, logType: string, content: string): Promise<void> {
