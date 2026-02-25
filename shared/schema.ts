@@ -31,6 +31,7 @@ export const devices = mysqlTable("devices", {
   ipAddress: text("ip_address"),
   lastSeen: datetime("last_seen"),
   active: boolean("active").notNull().default(true),
+  timezone: int("timezone").notNull().default(1),
   attlogStamp: text("attlog_stamp").default("0"),
   operlogStamp: text("operlog_stamp").default("0"),
   attphotoStamp: text("attphoto_stamp").default("0"),

@@ -42,7 +42,7 @@ export default function Devices() {
 
   const form = useForm<InsertDevice>({
     resolver: zodResolver(insertDeviceSchema),
-    defaultValues: { serialNumber: "", clientId: 0, alias: "", active: true },
+    defaultValues: { serialNumber: "", clientId: 0, alias: "", active: true, timezone: 1 },
   });
 
   const createMutation = useMutation({
@@ -122,13 +122,14 @@ export default function Devices() {
       clientId: device.clientId,
       alias: device.alias || "",
       active: device.active,
+      timezone: device.timezone ?? 1,
     });
     setOpen(true);
   }
 
   function openNew() {
     setEditingDevice(null);
-    form.reset({ serialNumber: "", clientId: 0, alias: "", active: true });
+    form.reset({ serialNumber: "", clientId: 0, alias: "", active: true, timezone: 1 });
     setOpen(true);
   }
 
@@ -195,6 +196,23 @@ export default function Devices() {
                     <FormControl>
                       <Input placeholder="Entrada principal" {...field} value={field.value ?? ""} data-testid="input-device-alias" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="timezone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Zona horaria (TimeZone)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="1"
+                        {...field}
+                        value={field.value ?? 1}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        data-testid="input-device-timezone"
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Valor que se envia al dispositivo en la configuracion ICLOCK (ej: 1 = Europe/Madrid)</p>
                     <FormMessage />
                   </FormItem>
                 )} />

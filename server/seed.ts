@@ -31,6 +31,7 @@ async function ensureTables() {
     };
     await addColumnSafe("clients", "users_api_url", "TEXT");
     await addColumnSafe("clients", "users_api_key", "TEXT");
+    await addColumnSafe("devices", "timezone", "INT NOT NULL DEFAULT 1");
     await conn.query(`CREATE TABLE IF NOT EXISTS device_users (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       client_id INT NOT NULL,
