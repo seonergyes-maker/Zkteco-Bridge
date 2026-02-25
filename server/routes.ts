@@ -267,14 +267,16 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  // Session setup
+  const isProduction = process.env.NODE_ENV === "production";
+
   app.use(session({
     secret: process.env.SESSION_SECRET || "fallback-secret-key",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false,
+      secure: isProduction,
       httpOnly: true,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 8 * 60 * 60 * 1000,
     },
   }));
@@ -340,7 +342,15 @@ export async function registerRoutes(
     req.session.username = user.username;
     await storage.createAccessLog(username, ip, true, "Login exitoso");
     log(`[Auth] Successful login: "${username}" from ${ip}`, "auth");
-    res.json({ username: user.username, id: user.id });
+
+    req.session.save((err) => {
+      if (err) {
+        log(`[Auth] Session save error: ${err.message}`, "auth");
+        res.status(500).json({ message: "Error al guardar la sesion" });
+        return;
+      }
+      res.json({ username: user.username, id: user.id });
+    });
   });
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
