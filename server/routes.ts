@@ -2,10 +2,20 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertClientSchema, insertDeviceSchema, insertScheduledTaskSchema, insertDeviceUserSchema } from "@shared/schema";
+import {
+  insertClientSchema,
+  insertDeviceSchema,
+  insertScheduledTaskSchema,
+  insertDeviceUserSchema,
+} from "@shared/schema";
 import { log } from "./index";
 import { encrypt, decrypt, maskApiKey, isEncrypted } from "./crypto";
-import { addProtocolLog, getProtocolLogs, clearProtocolLogs, getLogTypes } from "./protocol-logger";
+import {
+  addProtocolLog,
+  getProtocolLogs,
+  clearProtocolLogs,
+  getLogTypes,
+} from "./protocol-logger";
 
 declare module "express-session" {
   interface SessionData {
@@ -16,16 +26,26 @@ declare module "express-session" {
 
 function buildCommandString(commandType: string, params?: any): string | null {
   switch (commandType) {
-    case "REBOOT": return "REBOOT";
-    case "INFO": return "INFO";
-    case "CHECK": return "CHECK";
-    case "LOG": return "LOG";
-    case "CLEAR_LOG": return "CLEAR LOG";
-    case "CLEAR_DATA": return "CLEAR DATA";
-    case "CLEAR_PHOTO": return "CLEAR PHOTO";
-    case "AC_UNLOCK": return "AC_UNLOCK";
-    case "AC_UNALARM": return "AC_UNALARM";
-    case "RELOAD_OPTIONS": return "RELOAD OPTIONS";
+    case "REBOOT":
+      return "REBOOT";
+    case "INFO":
+      return "INFO";
+    case "CHECK":
+      return "CHECK";
+    case "LOG":
+      return "LOG";
+    case "CLEAR_LOG":
+      return "CLEAR LOG";
+    case "CLEAR_DATA":
+      return "CLEAR DATA";
+    case "CLEAR_PHOTO":
+      return "CLEAR PHOTO";
+    case "AC_UNLOCK":
+      return "AC_UNLOCK";
+    case "AC_UNALARM":
+      return "AC_UNALARM";
+    case "RELOAD_OPTIONS":
+      return "RELOAD OPTIONS";
     case "SET_OPTION":
       if (!params?.item || params?.value === undefined) return null;
       return `SET OPTION ${params.item}=${params.value}`;
@@ -36,7 +56,9 @@ function buildCommandString(commandType: string, params?: any): string | null {
       if (!params?.startTime || !params?.endTime) return null;
       return `DATA QUERY ATTPHOTO StartTime=${params.startTime}\tEndTime=${params.endTime}`;
     case "QUERY_USERINFO":
-      return params?.pin ? `DATA QUERY USERINFO PIN=${params.pin}` : `DATA QUERY USERINFO`;
+      return params?.pin
+        ? `DATA QUERY USERINFO PIN=${params.pin}`
+        : `DATA QUERY USERINFO`;
     case "QUERY_FINGERTMP":
       if (params?.pin && params?.fingerId !== undefined) {
         return `DATA QUERY FINGERTMP PIN=${params.pin}\tFingerID=${params.fingerId}`;
@@ -51,7 +73,8 @@ function buildCommandString(commandType: string, params?: any): string | null {
         if (params.name) parts.push(`Name=${params.name}`);
         if (params.password) parts.push(`Passwd=${params.password}`);
         if (params.card) parts.push(`Card=${params.card}`);
-        if (params.privilege !== undefined) parts.push(`Pri=${params.privilege}`);
+        if (params.privilege !== undefined)
+          parts.push(`Pri=${params.privilege}`);
         if (params.group !== undefined) parts.push(`Grp=${params.group}`);
         if (params.tz !== undefined) parts.push(`TZ=${params.tz}`);
         return `DATA USER ${parts.join("\t")}`;
@@ -60,7 +83,14 @@ function buildCommandString(commandType: string, params?: any): string | null {
       if (!params?.pin) return null;
       return `DATA DEL_USER PIN=${params.pin}`;
     case "DATA_FP":
-      if (!params?.pin || params?.fid === undefined || !params?.size || params?.valid === undefined || !params?.tmp) return null;
+      if (
+        !params?.pin ||
+        params?.fid === undefined ||
+        !params?.size ||
+        params?.valid === undefined ||
+        !params?.tmp
+      )
+        return null;
       return `DATA FP PIN=${params.pin}\tFID=${params.fid}\tSize=${params.size}\tValid=${params.valid}\tTMP=${params.tmp}`;
     case "DATA_DEL_FP":
       if (!params?.pin || params?.fid === undefined) return null;
@@ -70,7 +100,8 @@ function buildCommandString(commandType: string, params?: any): string | null {
       {
         const parts = [`PIN=${params.pin}`, `FID=${params.fid}`];
         if (params.retry !== undefined) parts.push(`RETRY=${params.retry}`);
-        if (params.overwrite !== undefined) parts.push(`OVERWRITE=${params.overwrite}`);
+        if (params.overwrite !== undefined)
+          parts.push(`OVERWRITE=${params.overwrite}`);
         return `ENROLL_FP ${parts.join("\t")}`;
       }
     case "UPDATE_USERPIC":
@@ -93,9 +124,18 @@ function buildCommandString(commandType: string, params?: any): string | null {
       if (params?.tzid === undefined) return null;
       return `DELETL TIMEZONE TZID=${params.tzid}`;
     case "UPDATE_GLOCK":
-      if (params?.glid === undefined || !params?.groupIds || params?.memberCount === undefined) return null;
+      if (
+        params?.glid === undefined ||
+        !params?.groupIds ||
+        params?.memberCount === undefined
+      )
+        return null;
       {
-        const parts = [`GLID=${params.glid}`, `GROUPIDS=${params.groupIds}`, `MEMBERCOUNT=${params.memberCount}`];
+        const parts = [
+          `GLID=${params.glid}`,
+          `GROUPIDS=${params.groupIds}`,
+          `MEMBERCOUNT=${params.memberCount}`,
+        ];
         if (params.reserve) parts.push(`RESERVE=${params.reserve}`);
         return `UPDATE GLOCK ${parts.join("\t")}`;
       }
@@ -103,9 +143,18 @@ function buildCommandString(commandType: string, params?: any): string | null {
       if (params?.glid === undefined) return null;
       return `DELETE GLOCK GLID=${params.glid}`;
     case "UPDATE_SMS":
-      if (!params?.msg || params?.tag === undefined || params?.uid === undefined) return null;
+      if (
+        !params?.msg ||
+        params?.tag === undefined ||
+        params?.uid === undefined
+      )
+        return null;
       {
-        const parts = [`MSG=${params.msg}`, `TAG=${params.tag}`, `UID=${params.uid}`];
+        const parts = [
+          `MSG=${params.msg}`,
+          `TAG=${params.tag}`,
+          `UID=${params.uid}`,
+        ];
         if (params.min !== undefined) parts.push(`MIN=${params.min}`);
         if (params.startTime) parts.push(`StartTime=${params.startTime}`);
         return `UPDATE SMS ${parts.join("\t")}`;
@@ -122,11 +171,21 @@ function buildCommandString(commandType: string, params?: any): string | null {
     case "PUTFILE":
       if (!params?.url || !params?.filePath) return null;
       return `PutFile ${params.url} ${params.filePath}`;
-    default: return null;
+    default:
+      return null;
   }
 }
 
-function computeNextRunAt(task: { scheduleType: string; runAt?: Date | null; intervalMinutes?: number | null; daysOfWeek?: string | null; timeOfDay?: string | null }, fromDate?: Date): Date | null {
+function computeNextRunAt(
+  task: {
+    scheduleType: string;
+    runAt?: Date | null;
+    intervalMinutes?: number | null;
+    daysOfWeek?: string | null;
+    timeOfDay?: string | null;
+  },
+  fromDate?: Date,
+): Date | null {
   const now = fromDate || new Date();
 
   if (task.scheduleType === "one_time") {
@@ -164,13 +223,21 @@ function computeNextRunAt(task: { scheduleType: string; runAt?: Date | null; int
   return null;
 }
 
-function validateScheduleFields(data: { scheduleType: string; runAt?: Date | null; intervalMinutes?: number | null; timeOfDay?: string | null; daysOfWeek?: string | null }): string | null {
+function validateScheduleFields(data: {
+  scheduleType: string;
+  runAt?: Date | null;
+  intervalMinutes?: number | null;
+  timeOfDay?: string | null;
+  daysOfWeek?: string | null;
+}): string | null {
   switch (data.scheduleType) {
     case "one_time":
-      if (!data.runAt) return "Falta la fecha/hora de ejecucion para tarea unica";
+      if (!data.runAt)
+        return "Falta la fecha/hora de ejecucion para tarea unica";
       break;
     case "interval":
-      if (!data.intervalMinutes || data.intervalMinutes < 1) return "Falta o invalido el intervalo en minutos";
+      if (!data.intervalMinutes || data.intervalMinutes < 1)
+        return "Falta o invalido el intervalo en minutos";
       break;
     case "daily":
       if (!data.timeOfDay) return "Falta la hora para tarea diaria";
@@ -184,7 +251,9 @@ function validateScheduleFields(data: { scheduleType: string; runAt?: Date | nul
 }
 
 function parseZktecoTimestamp(timeStr: string): Date | null {
-  const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  const match = timeStr.match(
+    /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/,
+  );
   if (!match) return null;
   const [, year, month, day, hour, min, sec] = match;
   const isoStr = `${year}-${month}-${day}T${hour}:${min}:${sec}.000Z`;
@@ -218,9 +287,10 @@ async function forwardEvent(event: any) {
   const retryAttempts = client.retryAttempts || 3;
   const retryDelayMs = client.retryDelayMs || 5000;
 
-  const eventTimestamp = event.timestamp instanceof Date
-    ? event.timestamp
-    : new Date(event.timestamp);
+  const eventTimestamp =
+    event.timestamp instanceof Date
+      ? event.timestamp
+      : new Date(event.timestamp);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -248,7 +318,10 @@ async function forwardEvent(event: any) {
 
       const errorText = await response.text();
       if (attempt === retryAttempts - 1) {
-        await storage.markEventForwardError(event.id, `HTTP ${response.status}: ${errorText}`);
+        await storage.markEventForwardError(
+          event.id,
+          `HTTP ${response.status}: ${errorText}`,
+        );
       }
     } catch (err: any) {
       if (attempt === retryAttempts - 1) {
@@ -257,27 +330,33 @@ async function forwardEvent(event: any) {
     }
 
     if (attempt < retryAttempts - 1) {
-      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
   }
 }
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express
+  app: Express,
 ): Promise<Server> {
-
   // Session setup
-  app.use(session({
-    secret: process.env.SESSION_SECRET || "fallback-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: false,
-      httpOnly: true,
-      maxAge: 8 * 60 * 60 * 1000,
-    },
-  }));
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || "fallback-secret-key",
+      resave: false,
+      saveUninitialized: false,
+      rolling: true,
+      proxy: true,
+      name: "dcrono.sid",
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 8 * 60 * 60 * 1000,
+      },
+    }),
+  );
 
   function requireAuth(req: Request, res: Response, next: NextFunction) {
     if (req.session.userId) {
@@ -288,7 +367,13 @@ export async function registerRoutes(
   }
 
   function getClientIp(req: Request): string {
-    return (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "127.0.0.1").split(",")[0].trim();
+    return (
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      "127.0.0.1"
+    )
+      .split(",")[0]
+      .trim();
   }
 
   // ===== Auth Routes =====
@@ -306,23 +391,53 @@ export async function registerRoutes(
       const lastFail = new Date(failedByUser[0].createdAt);
       const unbanAt = new Date(lastFail.getTime() + 30 * 60 * 1000);
       const remaining = Math.ceil((unbanAt.getTime() - Date.now()) / 60000);
-      await storage.createAccessLog(username, ip, false, "Cuenta bloqueada temporalmente");
-      log(`[Auth] Login blocked for ${username} - banned for ${remaining} more min`, "auth");
-      res.status(429).json({ message: `Cuenta bloqueada. Intente de nuevo en ${remaining} minutos.` });
+      await storage.createAccessLog(
+        username,
+        ip,
+        false,
+        "Cuenta bloqueada temporalmente",
+      );
+      log(
+        `[Auth] Login blocked for ${username} - banned for ${remaining} more min`,
+        "auth",
+      );
+      res
+        .status(429)
+        .json({
+          message: `Cuenta bloqueada. Intente de nuevo en ${remaining} minutos.`,
+        });
       return;
     }
 
     const failedByIp = await storage.getRecentFailedAttemptsByIp(ip, 30);
     if (failedByIp.length >= 5) {
-      await storage.createAccessLog(username, ip, false, "IP bloqueada por multiples intentos");
-      log(`[Auth] Login blocked for IP ${ip} - too many failed attempts`, "auth");
-      res.status(429).json({ message: "Demasiados intentos fallidos desde esta IP. Intente mas tarde." });
+      await storage.createAccessLog(
+        username,
+        ip,
+        false,
+        "IP bloqueada por multiples intentos",
+      );
+      log(
+        `[Auth] Login blocked for IP ${ip} - too many failed attempts`,
+        "auth",
+      );
+      res
+        .status(429)
+        .json({
+          message:
+            "Demasiados intentos fallidos desde esta IP. Intente mas tarde.",
+        });
       return;
     }
 
     const user = await storage.getAdminUser(username);
     if (!user || !user.active) {
-      await storage.createAccessLog(username, ip, false, "Usuario no encontrado");
+      await storage.createAccessLog(
+        username,
+        ip,
+        false,
+        "Usuario no encontrado",
+      );
       log(`[Auth] Failed login: unknown user "${username}" from ${ip}`, "auth");
       res.status(401).json({ message: "Credenciales incorrectas" });
       return;
@@ -330,17 +445,36 @@ export async function registerRoutes(
 
     const decryptedPassword = decrypt(user.passwordEncrypted);
     if (decryptedPassword !== password) {
-      await storage.createAccessLog(username, ip, false, "Contrasena incorrecta");
-      log(`[Auth] Failed login: wrong password for "${username}" from ${ip}`, "auth");
+      await storage.createAccessLog(
+        username,
+        ip,
+        false,
+        "Contrasena incorrecta",
+      );
+      log(
+        `[Auth] Failed login: wrong password for "${username}" from ${ip}`,
+        "auth",
+      );
       res.status(401).json({ message: "Credenciales incorrectas" });
       return;
     }
 
     req.session.userId = user.id;
     req.session.username = user.username;
-    await storage.createAccessLog(username, ip, true, "Login exitoso");
-    log(`[Auth] Successful login: "${username}" from ${ip}`, "auth");
-    res.json({ username: user.username, id: user.id });
+
+    req.session.save(async (err) => {
+      if (err) {
+        console.error("[Auth] Session save error:", err);
+        return res.status(500).json({ message: "Error de sesion" });
+      }
+
+      await storage.createAccessLog(username, ip, true, "Login exitoso");
+      log(`[Auth] Successful login: "${username}" from ${ip}`, "auth");
+      console.log("[Auth] Session creada:", req.sessionID);
+
+      res.json({ username: user.username, id: user.id });
+    });
+    return;
   });
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
@@ -362,35 +496,49 @@ export async function registerRoutes(
     res.json({ authenticated: false });
   });
 
-  app.get("/api/auth/access-logs", requireAuth, async (_req: Request, res: Response) => {
-    const logs = await storage.getAccessLogs(200);
-    res.json(logs);
-  });
+  app.get(
+    "/api/auth/access-logs",
+    requireAuth,
+    async (_req: Request, res: Response) => {
+      const logs = await storage.getAccessLogs(200);
+      res.json(logs);
+    },
+  );
 
-  app.post("/api/auth/change-password", requireAuth, async (req: Request, res: Response) => {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      res.status(400).json({ message: "Contrasena actual y nueva requeridas" });
-      return;
-    }
-    if (newPassword.length < 6) {
-      res.status(400).json({ message: "La nueva contrasena debe tener al menos 6 caracteres" });
-      return;
-    }
-    const user = await storage.getAdminUserById(req.session.userId!);
-    if (!user) {
-      res.status(404).json({ message: "Usuario no encontrado" });
-      return;
-    }
-    const decrypted = decrypt(user.passwordEncrypted);
-    if (decrypted !== currentPassword) {
-      res.status(401).json({ message: "Contrasena actual incorrecta" });
-      return;
-    }
-    await storage.updateAdminPassword(user.id, encrypt(newPassword));
-    log(`[Auth] Password changed for "${user.username}"`, "auth");
-    res.json({ success: true });
-  });
+  app.post(
+    "/api/auth/change-password",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        res
+          .status(400)
+          .json({ message: "Contrasena actual y nueva requeridas" });
+        return;
+      }
+      if (newPassword.length < 6) {
+        res
+          .status(400)
+          .json({
+            message: "La nueva contrasena debe tener al menos 6 caracteres",
+          });
+        return;
+      }
+      const user = await storage.getAdminUserById(req.session.userId!);
+      if (!user) {
+        res.status(404).json({ message: "Usuario no encontrado" });
+        return;
+      }
+      const decrypted = decrypt(user.passwordEncrypted);
+      if (decrypted !== currentPassword) {
+        res.status(401).json({ message: "Contrasena actual incorrecta" });
+        return;
+      }
+      await storage.updateAdminPassword(user.id, encrypt(newPassword));
+      log(`[Auth] Password changed for "${user.username}"`, "auth");
+      res.json({ success: true });
+    },
+  );
 
   // Protect all /api/ routes except auth and ZKTeco PUSH endpoints
   app.use("/api", (req: Request, res: Response, next: NextFunction) => {
@@ -404,8 +552,13 @@ export async function registerRoutes(
     const allClients = await storage.getClients();
     for (const client of allClients) {
       if (client.oracleApiKey && !isEncrypted(client.oracleApiKey)) {
-        await storage.updateClient(client.id, { oracleApiKey: encrypt(client.oracleApiKey) });
-        log(`[Security] Encrypted API key for client ${client.clientId}`, "security");
+        await storage.updateClient(client.id, {
+          oracleApiKey: encrypt(client.oracleApiKey),
+        });
+        log(
+          `[Security] Encrypted API key for client ${client.clientId}`,
+          "security",
+        );
       }
     }
   } catch (err: any) {
@@ -429,22 +582,35 @@ export async function registerRoutes(
     const device = await storage.getDeviceBySerial(sn);
 
     // Update last seen
-    const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
+    const ip = (
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      ""
+    )
+      .split(",")[0]
+      .trim();
     await storage.updateDeviceLastSeen(sn, ip);
 
     if (!device) {
       log(`[PUSH] Unknown device ${sn} - not registered`, "zkteco");
     } else if (!device.model) {
       const existingCmds = await storage.getPendingCommands(sn);
-      const hasInfoCmd = existingCmds.some(c => c.command === "INFO");
+      const hasInfoCmd = existingCmds.some((c) => c.command === "INFO");
       if (!hasInfoCmd) {
         const cmdId = `CMD_${Date.now()}_auto_info`;
         await storage.createCommand(sn, cmdId, "INFO");
-        log(`[PUSH] Auto-queued INFO command for device ${sn} to detect model`, "zkteco");
+        log(
+          `[PUSH] Auto-queued INFO command for device ${sn} to detect model`,
+          "zkteco",
+        );
       }
     }
 
-    const stamps = device || { attlogStamp: "0", operlogStamp: "0", attphotoStamp: "0" };
+    const stamps = device || {
+      attlogStamp: "0",
+      operlogStamp: "0",
+      attphotoStamp: "0",
+    };
 
     const responseLines = [
       `GET OPTION FROM: ${sn}`,
@@ -465,8 +631,26 @@ export async function registerRoutes(
 
     const responseBody = responseLines.join("\n") + "\n";
 
-    addProtocolLog("IN", sn, "/iclock/cdata", "GET", `Registro/config (options=${options})`, `Query: SN=${sn}&options=${options}`, ip, "CONFIG");
-    addProtocolLog("OUT", sn, "/iclock/cdata", "GET", `Config enviada al dispositivo`, responseBody, ip, "CONFIG");
+    addProtocolLog(
+      "IN",
+      sn,
+      "/iclock/cdata",
+      "GET",
+      `Registro/config (options=${options})`,
+      `Query: SN=${sn}&options=${options}`,
+      ip,
+      "CONFIG",
+    );
+    addProtocolLog(
+      "OUT",
+      sn,
+      "/iclock/cdata",
+      "GET",
+      `Config enviada al dispositivo`,
+      responseBody,
+      ip,
+      "CONFIG",
+    );
 
     res.set("Content-Type", "text/plain");
     res.send(responseBody);
@@ -483,7 +667,13 @@ export async function registerRoutes(
       return;
     }
 
-    const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
+    const ip = (
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      ""
+    )
+      .split(",")[0]
+      .trim();
     await storage.updateDeviceLastSeen(sn, ip);
 
     let body = "";
@@ -492,14 +682,28 @@ export async function registerRoutes(
     } else if (Buffer.isBuffer(req.body)) {
       body = req.body.toString("utf-8");
     } else if (req.rawBody) {
-      body = Buffer.isBuffer(req.rawBody) ? (req.rawBody as Buffer).toString("utf-8") : String(req.rawBody);
+      body = Buffer.isBuffer(req.rawBody)
+        ? (req.rawBody as Buffer).toString("utf-8")
+        : String(req.rawBody);
     }
 
-    log(`[PUSH] Device ${sn} uploading ${table} (stamp=${stamp}), body length: ${body.length}`, "zkteco");
-    addProtocolLog("IN", sn, "/iclock/cdata", "POST", `Datos ${table} (stamp=${stamp}, ${body.length} bytes)`, body || "(vacio)", ip, table || "DATA");
+    log(
+      `[PUSH] Device ${sn} uploading ${table} (stamp=${stamp}), body length: ${body.length}`,
+      "zkteco",
+    );
+    addProtocolLog(
+      "IN",
+      sn,
+      "/iclock/cdata",
+      "POST",
+      `Datos ${table} (stamp=${stamp}, ${body.length} bytes)`,
+      body || "(vacio)",
+      ip,
+      table || "DATA",
+    );
 
     if (table === "ATTLOG") {
-      const lines = body.split("\n").filter(l => l.trim());
+      const lines = body.split("\n").filter((l) => l.trim());
       let processedCount = 0;
 
       for (const line of lines) {
@@ -517,13 +721,19 @@ export async function registerRoutes(
 
           const parsedTime = parseZktecoTimestamp(time);
           if (!parsedTime) {
-            log(`[PUSH] Invalid timestamp format: "${time}" from ${sn}`, "zkteco");
+            log(
+              `[PUSH] Invalid timestamp format: "${time}" from ${sn}`,
+              "zkteco",
+            );
             continue;
           }
 
           const exists = await storage.eventExists(sn, pin, parsedTime);
           if (exists) {
-            log(`[PUSH] Duplicate event skipped: ${pin} @ ${time} from ${sn}`, "zkteco");
+            log(
+              `[PUSH] Duplicate event skipped: ${pin} @ ${time} from ${sn}`,
+              "zkteco",
+            );
             continue;
           }
 
@@ -543,8 +753,11 @@ export async function registerRoutes(
           processedCount++;
 
           // Forward event asynchronously
-          forwardEvent(event).catch(err => {
-            log(`[FORWARD] Error forwarding event ${event.id}: ${err.message}`, "zkteco");
+          forwardEvent(event).catch((err) => {
+            log(
+              `[FORWARD] Error forwarding event ${event.id}: ${err.message}`,
+              "zkteco",
+            );
           });
         } catch (err: any) {
           log(`[PUSH] Error processing ATTLOG line: ${err.message}`, "zkteco");
@@ -555,9 +768,12 @@ export async function registerRoutes(
         await storage.updateDeviceStamps(sn, { attlogStamp: stamp });
       }
 
-      log(`[PUSH] Processed ${processedCount} attendance records from ${sn}`, "zkteco");
+      log(
+        `[PUSH] Processed ${processedCount} attendance records from ${sn}`,
+        "zkteco",
+      );
     } else if (table === "OPERLOG") {
-      const lines = body.split("\n").filter(l => l.trim());
+      const lines = body.split("\n").filter((l) => l.trim());
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
@@ -579,7 +795,9 @@ export async function registerRoutes(
               for (const pair of pairs) {
                 const eqIdx = pair.indexOf("=");
                 if (eqIdx > 0) {
-                  fields[pair.substring(0, eqIdx).trim()] = pair.substring(eqIdx + 1).trim();
+                  fields[pair.substring(0, eqIdx).trim()] = pair
+                    .substring(eqIdx + 1)
+                    .trim();
                 }
               }
 
@@ -590,16 +808,41 @@ export async function registerRoutes(
               const pri = fields["Pri"];
 
               if (pin) {
-                const existingUser = await storage.getDeviceUserByPin(device.clientId, pin);
+                const existingUser = await storage.getDeviceUserByPin(
+                  device.clientId,
+                  pin,
+                );
                 if (existingUser) {
                   const updateFields: Record<string, any> = {};
-                  if (name !== undefined && (name || null) !== (existingUser.name || null)) updateFields.name = name || null;
-                  if (passwd !== undefined && (passwd || null) !== (existingUser.password || null)) updateFields.password = passwd || null;
-                  if (card !== undefined && (card || null) !== (existingUser.card || null)) updateFields.card = card || null;
-                  if (pri !== undefined && parseInt(pri) !== existingUser.privilege) updateFields.privilege = parseInt(pri);
+                  if (
+                    name !== undefined &&
+                    (name || null) !== (existingUser.name || null)
+                  )
+                    updateFields.name = name || null;
+                  if (
+                    passwd !== undefined &&
+                    (passwd || null) !== (existingUser.password || null)
+                  )
+                    updateFields.password = passwd || null;
+                  if (
+                    card !== undefined &&
+                    (card || null) !== (existingUser.card || null)
+                  )
+                    updateFields.card = card || null;
+                  if (
+                    pri !== undefined &&
+                    parseInt(pri) !== existingUser.privilege
+                  )
+                    updateFields.privilege = parseInt(pri);
                   if (Object.keys(updateFields).length > 0) {
-                    await storage.updateDeviceUser(existingUser.id, updateFields);
-                    log(`[OPERLOG] Usuario actualizado PIN=${pin} del cliente ${device.clientId}: ${Object.keys(updateFields).join(", ")}`, "users");
+                    await storage.updateDeviceUser(
+                      existingUser.id,
+                      updateFields,
+                    );
+                    log(
+                      `[OPERLOG] Usuario actualizado PIN=${pin} del cliente ${device.clientId}: ${Object.keys(updateFields).join(", ")}`,
+                      "users",
+                    );
                   }
                 } else {
                   await storage.createDeviceUser({
@@ -610,28 +853,47 @@ export async function registerRoutes(
                     card: card || null,
                     privilege: pri ? parseInt(pri) : 0,
                   });
-                  log(`[OPERLOG] Nuevo usuario creado desde OPERLOG: PIN=${pin}, Name=${name || "-"}, Card=${card || "-"}, cliente ${device.clientId}`, "users");
+                  log(
+                    `[OPERLOG] Nuevo usuario creado desde OPERLOG: PIN=${pin}, Name=${name || "-"}, Card=${card || "-"}, cliente ${device.clientId}`,
+                    "users",
+                  );
                 }
 
                 const oldCard = existingUser?.card || null;
-                const newCard = card !== undefined ? (card || null) : oldCard;
+                const newCard = card !== undefined ? card || null : oldCard;
                 if (card !== undefined && newCard !== oldCard) {
-                  const clientDevices = await storage.getDevicesByClientId(device.clientId);
-                  const otherDevices = clientDevices.filter(d => d.serialNumber !== sn && d.active);
+                  const clientDevices = await storage.getDevicesByClientId(
+                    device.clientId,
+                  );
+                  const otherDevices = clientDevices.filter(
+                    (d) => d.serialNumber !== sn && d.active,
+                  );
 
                   if (otherDevices.length > 0) {
-                    const updatedUser = await storage.getDeviceUserByPin(device.clientId, pin);
+                    const updatedUser = await storage.getDeviceUserByPin(
+                      device.clientId,
+                      pin,
+                    );
                     if (updatedUser) {
                       for (const otherDev of otherDevices) {
                         const parts = [`PIN=${pin}`];
-                        if (updatedUser.name) parts.push(`Name=${updatedUser.name}`);
-                        if (updatedUser.password) parts.push(`Passwd=${updatedUser.password}`);
+                        if (updatedUser.name)
+                          parts.push(`Name=${updatedUser.name}`);
+                        if (updatedUser.password)
+                          parts.push(`Passwd=${updatedUser.password}`);
                         parts.push(`Card=${newCard || ""}`);
                         parts.push(`Pri=${updatedUser.privilege}`);
                         const commandStr = `DATA USER ${parts.join("\t")}`;
                         const cmdId = `CARDSYNC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-                        await storage.createCommand(otherDev.serialNumber, cmdId, commandStr);
-                        log(`[CARDSYNC] Replicando Card=${newCard || "(vacia)"} de PIN=${pin} al dispositivo ${otherDev.serialNumber}`, "users");
+                        await storage.createCommand(
+                          otherDev.serialNumber,
+                          cmdId,
+                          commandStr,
+                        );
+                        log(
+                          `[CARDSYNC] Replicando Card=${newCard || "(vacia)"} de PIN=${pin} al dispositivo ${otherDev.serialNumber}`,
+                          "users",
+                        );
                       }
                     }
                   }
@@ -648,7 +910,10 @@ export async function registerRoutes(
         await storage.updateDeviceStamps(sn, { operlogStamp: stamp });
       }
 
-      log(`[PUSH] Processed ${lines.length} operation logs from ${sn}`, "zkteco");
+      log(
+        `[PUSH] Processed ${lines.length} operation logs from ${sn}`,
+        "zkteco",
+      );
     } else if (table === "ATTPHOTO") {
       if (stamp) {
         await storage.updateDeviceStamps(sn, { attphotoStamp: stamp });
@@ -669,15 +934,33 @@ export async function registerRoutes(
       return;
     }
 
-    const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
+    const ip = (
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      ""
+    )
+      .split(",")[0]
+      .trim();
     await storage.updateDeviceLastSeen(sn, ip);
 
-    addProtocolLog("IN", sn, "/iclock/getrequest", "GET", `Polling de comandos`, `Query: SN=${sn}`, ip, "POLLING");
+    addProtocolLog(
+      "IN",
+      sn,
+      "/iclock/getrequest",
+      "GET",
+      `Polling de comandos`,
+      `Query: SN=${sn}`,
+      ip,
+      "POLLING",
+    );
 
     const device = await storage.getDeviceBySerial(sn);
     if (device) {
       try {
-        const unsyncedUsers = await storage.getUnsyncedUsersForDevice(device.clientId, sn);
+        const unsyncedUsers = await storage.getUnsyncedUsersForDevice(
+          device.clientId,
+          sn,
+        );
         if (unsyncedUsers.length > 0) {
           for (const user of unsyncedUsers) {
             const parts = [`PIN=${user.pin}`];
@@ -690,10 +973,16 @@ export async function registerRoutes(
             await storage.createCommand(sn, cmdId, commandStr);
             await storage.updateDeviceUserSyncStatus(user.id, sn);
           }
-          log(`[AUTOSYNC] ${unsyncedUsers.length} usuario(s) auto-sincronizado(s) al dispositivo ${sn}`, "users");
+          log(
+            `[AUTOSYNC] ${unsyncedUsers.length} usuario(s) auto-sincronizado(s) al dispositivo ${sn}`,
+            "users",
+          );
         }
       } catch (err: any) {
-        log(`[AUTOSYNC] Error auto-sincronizando usuarios: ${err.message}`, "error");
+        log(
+          `[AUTOSYNC] Error auto-sincronizando usuarios: ${err.message}`,
+          "error",
+        );
       }
     }
 
@@ -705,7 +994,7 @@ export async function registerRoutes(
       return;
     }
 
-    const lines = commands.map(cmd => {
+    const lines = commands.map((cmd) => {
       if (/^C:\d+:/.test(cmd.command)) {
         return cmd.command;
       }
@@ -713,7 +1002,16 @@ export async function registerRoutes(
     });
     const responseBody = lines.join("\n") + "\n";
 
-    addProtocolLog("OUT", sn, "/iclock/getrequest", "GET", `${commands.length} comando(s) enviado(s)`, responseBody, ip, "COMANDOS");
+    addProtocolLog(
+      "OUT",
+      sn,
+      "/iclock/getrequest",
+      "GET",
+      `${commands.length} comando(s) enviado(s)`,
+      responseBody,
+      ip,
+      "COMANDOS",
+    );
 
     res.set("Content-Type", "text/plain");
     res.send(responseBody);
@@ -723,7 +1021,13 @@ export async function registerRoutes(
   app.post("/iclock/devicecmd", async (req: Request, res: Response) => {
     const sn = req.query.SN as string;
 
-    const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "").split(",")[0].trim();
+    const ip = (
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      ""
+    )
+      .split(",")[0]
+      .trim();
     if (sn) await storage.updateDeviceLastSeen(sn, ip);
 
     let body = "";
@@ -732,11 +1036,25 @@ export async function registerRoutes(
     } else if (Buffer.isBuffer(req.body)) {
       body = req.body.toString("utf-8");
     } else if (req.rawBody) {
-      body = Buffer.isBuffer(req.rawBody) ? (req.rawBody as Buffer).toString("utf-8") : String(req.rawBody);
+      body = Buffer.isBuffer(req.rawBody)
+        ? (req.rawBody as Buffer).toString("utf-8")
+        : String(req.rawBody);
     }
 
-    log(`[PUSH] Device ${sn} command result: ${body.substring(0, 200)}`, "zkteco");
-    addProtocolLog("IN", sn || "?", "/iclock/devicecmd", "POST", `Resultado de comando`, body || "(vacio)", ip, "COMANDOS");
+    log(
+      `[PUSH] Device ${sn} command result: ${body.substring(0, 200)}`,
+      "zkteco",
+    );
+    addProtocolLog(
+      "IN",
+      sn || "?",
+      "/iclock/devicecmd",
+      "POST",
+      `Resultado de comando`,
+      body || "(vacio)",
+      ip,
+      "COMANDOS",
+    );
 
     // Parse: ID=iiii&Return=vvvv&CMD=ssss
     const cmdParams = new URLSearchParams(body);
@@ -753,13 +1071,24 @@ export async function registerRoutes(
         let fwVersion = "";
         for (const line of infoLines) {
           const trimmed = line.trim();
-          if (trimmed.startsWith("~DeviceName=")) deviceName = trimmed.substring("~DeviceName=".length).trim();
-          else if (trimmed.startsWith("DeviceName=") && !deviceName) deviceName = trimmed.substring("DeviceName=".length).trim();
-          if (trimmed.startsWith("FWVersion=")) fwVersion = trimmed.substring("FWVersion=".length).trim();
+          if (trimmed.startsWith("~DeviceName="))
+            deviceName = trimmed.substring("~DeviceName=".length).trim();
+          else if (trimmed.startsWith("DeviceName=") && !deviceName)
+            deviceName = trimmed.substring("DeviceName=".length).trim();
+          if (trimmed.startsWith("FWVersion="))
+            fwVersion = trimmed.substring("FWVersion=".length).trim();
         }
         if (deviceName || fwVersion) {
-          await storage.updateDeviceLastSeen(sn, undefined, fwVersion || undefined, deviceName || undefined);
-          log(`[PUSH] Auto-detected device ${sn}: model=${deviceName}, firmware=${fwVersion}`, "zkteco");
+          await storage.updateDeviceLastSeen(
+            sn,
+            undefined,
+            fwVersion || undefined,
+            deviceName || undefined,
+          );
+          log(
+            `[PUSH] Auto-detected device ${sn}: model=${deviceName}, firmware=${fwVersion}`,
+            "zkteco",
+          );
         }
       }
     }
@@ -870,29 +1199,41 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  app.post("/api/devices/:id/recover-users", async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    const device = await storage.getDevice(id);
-    if (!device) {
-      res.status(404).json({ message: "Dispositivo no encontrado" });
-      return;
-    }
+  app.post(
+    "/api/devices/:id/recover-users",
+    async (req: Request, res: Response) => {
+      const id = parseInt(req.params.id);
+      const device = await storage.getDevice(id);
+      if (!device) {
+        res.status(404).json({ message: "Dispositivo no encontrado" });
+        return;
+      }
 
-    const cmdId = `RECOVER_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const commandStr = "DATA QUERY USERINFO";
+      const cmdId = `RECOVER_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const commandStr = "DATA QUERY USERINFO";
 
-    try {
-      const cmd = await storage.createCommand(device.serialNumber, cmdId, commandStr);
-      log(`[CMD] Recuperar usuarios enviado a ${device.serialNumber} (${device.alias || "sin alias"})`, "commands");
-      res.json({ success: true, command: cmd });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
+      try {
+        const cmd = await storage.createCommand(
+          device.serialNumber,
+          cmdId,
+          commandStr,
+        );
+        log(
+          `[CMD] Recuperar usuarios enviado a ${device.serialNumber} (${device.alias || "sin alias"})`,
+          "commands",
+        );
+        res.json({ success: true, command: cmd });
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
+      }
+    },
+  );
 
   // Events
   app.get("/api/events", async (req: Request, res: Response) => {
-    const clientId = req.query.clientId ? parseInt(req.query.clientId as string, 10) : undefined;
+    const clientId = req.query.clientId
+      ? parseInt(req.query.clientId as string, 10)
+      : undefined;
     const list = await storage.getEvents(500, clientId);
     res.json(list);
   });
@@ -907,63 +1248,75 @@ export async function registerRoutes(
     res.json(count);
   });
 
-  app.post("/api/events/retry-forward", async (_req: Request, res: Response) => {
-    const pending = await storage.getPendingEvents();
-    let forwarded = 0;
-    for (const event of pending) {
-      try {
-        await forwardEvent(event);
-        forwarded++;
-      } catch (err) {
-        // Continue with next event
+  app.post(
+    "/api/events/retry-forward",
+    async (_req: Request, res: Response) => {
+      const pending = await storage.getPendingEvents();
+      let forwarded = 0;
+      for (const event of pending) {
+        try {
+          await forwardEvent(event);
+          forwarded++;
+        } catch (err) {
+          // Continue with next event
+        }
       }
-    }
-    res.json({ forwarded, total: pending.length });
-  });
+      res.json({ forwarded, total: pending.length });
+    },
+  );
 
   app.delete("/api/events", async (_req: Request, res: Response) => {
     await storage.deleteAllEvents();
     res.json({ message: "Todos los eventos de fichaje han sido eliminados" });
   });
 
-  app.post("/api/clients/:id/test-forwarding", async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    const client = await storage.getClient(id);
-    if (!client) {
-      res.status(404).json({ message: "Cliente no encontrado" });
-      return;
-    }
-    if (!client.oracleApiUrl) {
-      res.json({ success: false, error: "No hay URL de API configurada para este cliente" });
-      return;
-    }
-    try {
-      const now = new Date();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        "X-Client-Id": client.clientId,
-        "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
-        "X-Pin": "TEST",
-        "X-Timestamp": formatOracleTimestamp(now),
-        "X-Incidence-Code": "0",
-        "X-Device-Serial": "TEST-DEVICE",
-        "X-Latitude": "0",
-        "X-Longitude": "0",
-      };
-      const response = await fetch(client.oracleApiUrl, {
-        method: "POST",
-        headers,
-      });
-      if (response.ok) {
-        res.json({ success: true });
-      } else {
-        const text = await response.text();
-        res.json({ success: false, error: `HTTP ${response.status}: ${text.substring(0, 200)}` });
+  app.post(
+    "/api/clients/:id/test-forwarding",
+    async (req: Request, res: Response) => {
+      const id = parseInt(req.params.id);
+      const client = await storage.getClient(id);
+      if (!client) {
+        res.status(404).json({ message: "Cliente no encontrado" });
+        return;
       }
-    } catch (err: any) {
-      res.json({ success: false, error: err.message });
-    }
-  });
+      if (!client.oracleApiUrl) {
+        res.json({
+          success: false,
+          error: "No hay URL de API configurada para este cliente",
+        });
+        return;
+      }
+      try {
+        const now = new Date();
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "X-Client-Id": client.clientId,
+          "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
+          "X-Pin": "TEST",
+          "X-Timestamp": formatOracleTimestamp(now),
+          "X-Incidence-Code": "0",
+          "X-Device-Serial": "TEST-DEVICE",
+          "X-Latitude": "0",
+          "X-Longitude": "0",
+        };
+        const response = await fetch(client.oracleApiUrl, {
+          method: "POST",
+          headers,
+        });
+        if (response.ok) {
+          res.json({ success: true });
+        } else {
+          const text = await response.text();
+          res.json({
+            success: false,
+            error: `HTTP ${response.status}: ${text.substring(0, 200)}`,
+          });
+        }
+      } catch (err: any) {
+        res.json({ success: false, error: err.message });
+      }
+    },
+  );
 
   // Commands API
   app.get("/api/commands", async (req: Request, res: Response) => {
@@ -976,7 +1329,9 @@ export async function registerRoutes(
     const { deviceSerial, commandType, params } = req.body;
 
     if (!deviceSerial || !commandType) {
-      res.status(400).json({ message: "Falta el dispositivo o tipo de comando" });
+      res
+        .status(400)
+        .json({ message: "Falta el dispositivo o tipo de comando" });
       return;
     }
 
@@ -988,7 +1343,11 @@ export async function registerRoutes(
 
     const commandStr = buildCommandString(commandType, params);
     if (!commandStr) {
-      res.status(400).json({ message: `Parametros invalidos para el comando ${commandType}` });
+      res
+        .status(400)
+        .json({
+          message: `Parametros invalidos para el comando ${commandType}`,
+        });
       return;
     }
 
@@ -996,7 +1355,10 @@ export async function registerRoutes(
 
     try {
       const cmd = await storage.createCommand(deviceSerial, cmdId, commandStr);
-      log(`[CMD] Command ${commandType} queued for ${deviceSerial}: ${commandStr}`, "commands");
+      log(
+        `[CMD] Command ${commandType} queued for ${deviceSerial}: ${commandStr}`,
+        "commands",
+      );
       res.json(cmd);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1005,7 +1367,9 @@ export async function registerRoutes(
 
   // Device Users API
   app.get("/api/device-users", async (req: Request, res: Response) => {
-    const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
+    const clientId = req.query.clientId
+      ? parseInt(req.query.clientId as string)
+      : undefined;
     const users = await storage.getDeviceUsers(clientId);
     res.json(users);
   });
@@ -1048,108 +1412,157 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/device-users/client/:clientId", async (req: Request, res: Response) => {
-    const clientId = parseInt(req.params.clientId);
-    try {
-      await storage.clearDeviceUsers(clientId);
-      res.json({ message: "Usuarios del cliente eliminados" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/device-users/sync-from-api", async (req: Request, res: Response) => {
-    const { clientId } = req.body;
-    if (!clientId) {
-      res.status(400).json({ message: "Falta el clientId" });
-      return;
-    }
-
-    const client = await storage.getClient(clientId);
-    if (!client) {
-      res.status(404).json({ message: "Cliente no encontrado" });
-      return;
-    }
-
-    if (!client.usersApiUrl) {
-      res.status(400).json({ message: "El cliente no tiene configurada una API de usuarios" });
-      return;
-    }
-
-    try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (client.usersApiKey) {
-        const apiKey = isEncrypted(client.usersApiKey) ? decrypt(client.usersApiKey) : client.usersApiKey;
-        headers["Authorization"] = `Bearer ${apiKey}`;
+  app.delete(
+    "/api/device-users/client/:clientId",
+    async (req: Request, res: Response) => {
+      const clientId = parseInt(req.params.clientId);
+      try {
+        await storage.clearDeviceUsers(clientId);
+        res.json({ message: "Usuarios del cliente eliminados" });
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
       }
+    },
+  );
 
-      const response = await fetch(client.usersApiUrl, { headers });
-      if (!response.ok) {
-        res.status(400).json({ message: `Error de la API: ${response.status} ${response.statusText}` });
+  app.post(
+    "/api/device-users/sync-from-api",
+    async (req: Request, res: Response) => {
+      const { clientId } = req.body;
+      if (!clientId) {
+        res.status(400).json({ message: "Falta el clientId" });
         return;
       }
 
-      const data = await response.json();
-      const usersArray = Array.isArray(data) ? data : (data.users || data.data || data.results || []);
-
-      if (!Array.isArray(usersArray) || usersArray.length === 0) {
-        res.status(400).json({ message: "La API no devolvio usuarios validos" });
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        res.status(404).json({ message: "Cliente no encontrado" });
         return;
       }
 
-      const mappedUsers = usersArray.map((u: any) => ({
-        clientId,
-        pin: String(u.pin || u.PIN || u.id || u.ID || u.employeeId || ""),
-        name: u.name || u.Name || u.nombre || u.Nombre || null,
-        password: u.password || u.Password || u.passwd || null,
-        card: u.card || u.Card || u.cardno || u.CardNo || null,
-        privilege: parseInt(u.privilege || u.Privilege || "0") || 0,
-      })).filter((u: any) => u.pin);
+      if (!client.usersApiUrl) {
+        res
+          .status(400)
+          .json({
+            message: "El cliente no tiene configurada una API de usuarios",
+          });
+        return;
+      }
 
-      const result = await storage.upsertDeviceUsers(clientId, mappedUsers);
-      log(`[USERS] Synced from API for client ${client.name}: ${result.created} created, ${result.updated} updated`, "users");
-      res.json({ message: `Sincronizados ${mappedUsers.length} usuarios: ${result.created} nuevos, ${result.updated} actualizados`, ...result, total: mappedUsers.length });
-    } catch (err: any) {
-      res.status(500).json({ message: `Error al conectar con la API: ${err.message}` });
-    }
-  });
+      try {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (client.usersApiKey) {
+          const apiKey = isEncrypted(client.usersApiKey)
+            ? decrypt(client.usersApiKey)
+            : client.usersApiKey;
+          headers["Authorization"] = `Bearer ${apiKey}`;
+        }
 
-  app.post("/api/device-users/sync-to-device", async (req: Request, res: Response) => {
-    const { userIds, deviceSerial } = req.body;
+        const response = await fetch(client.usersApiUrl, { headers });
+        if (!response.ok) {
+          res
+            .status(400)
+            .json({
+              message: `Error de la API: ${response.status} ${response.statusText}`,
+            });
+          return;
+        }
 
-    if (!deviceSerial || !userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      res.status(400).json({ message: "Falta el dispositivo o los usuarios" });
-      return;
-    }
+        const data = await response.json();
+        const usersArray = Array.isArray(data)
+          ? data
+          : data.users || data.data || data.results || [];
 
-    const device = await storage.getDeviceBySerial(deviceSerial);
-    if (!device) {
-      res.status(404).json({ message: "Dispositivo no encontrado" });
-      return;
-    }
+        if (!Array.isArray(usersArray) || usersArray.length === 0) {
+          res
+            .status(400)
+            .json({ message: "La API no devolvio usuarios validos" });
+          return;
+        }
 
-    let queued = 0;
-    for (const userId of userIds) {
-      const user = await storage.getDeviceUser(userId);
-      if (!user) continue;
+        const mappedUsers = usersArray
+          .map((u: any) => ({
+            clientId,
+            pin: String(u.pin || u.PIN || u.id || u.ID || u.employeeId || ""),
+            name: u.name || u.Name || u.nombre || u.Nombre || null,
+            password: u.password || u.Password || u.passwd || null,
+            card: u.card || u.Card || u.cardno || u.CardNo || null,
+            privilege: parseInt(u.privilege || u.Privilege || "0") || 0,
+          }))
+          .filter((u: any) => u.pin);
 
-      const parts = [`PIN=${user.pin}`];
-      if (user.name) parts.push(`Name=${user.name}`);
-      if (user.password) parts.push(`Passwd=${user.password}`);
-      if (user.card) parts.push(`Card=${user.card}`);
-      parts.push(`Pri=${user.privilege}`);
+        const result = await storage.upsertDeviceUsers(clientId, mappedUsers);
+        log(
+          `[USERS] Synced from API for client ${client.name}: ${result.created} created, ${result.updated} updated`,
+          "users",
+        );
+        res.json({
+          message: `Sincronizados ${mappedUsers.length} usuarios: ${result.created} nuevos, ${result.updated} actualizados`,
+          ...result,
+          total: mappedUsers.length,
+        });
+      } catch (err: any) {
+        res
+          .status(500)
+          .json({ message: `Error al conectar con la API: ${err.message}` });
+      }
+    },
+  );
 
-      const commandStr = `DATA USER ${parts.join("\t")}`;
-      const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  app.post(
+    "/api/device-users/sync-to-device",
+    async (req: Request, res: Response) => {
+      const { userIds, deviceSerial } = req.body;
 
-      await storage.createCommand(deviceSerial, cmdId, commandStr);
-      await storage.updateDeviceUserSyncStatus(userId, deviceSerial);
-      queued++;
-    }
+      if (
+        !deviceSerial ||
+        !userIds ||
+        !Array.isArray(userIds) ||
+        userIds.length === 0
+      ) {
+        res
+          .status(400)
+          .json({ message: "Falta el dispositivo o los usuarios" });
+        return;
+      }
 
-    log(`[USERS] ${queued} users queued for sync to device ${deviceSerial}`, "users");
-    res.json({ message: `${queued} usuario(s) encolados para enviar al dispositivo ${deviceSerial}`, queued });
-  });
+      const device = await storage.getDeviceBySerial(deviceSerial);
+      if (!device) {
+        res.status(404).json({ message: "Dispositivo no encontrado" });
+        return;
+      }
+
+      let queued = 0;
+      for (const userId of userIds) {
+        const user = await storage.getDeviceUser(userId);
+        if (!user) continue;
+
+        const parts = [`PIN=${user.pin}`];
+        if (user.name) parts.push(`Name=${user.name}`);
+        if (user.password) parts.push(`Passwd=${user.password}`);
+        if (user.card) parts.push(`Card=${user.card}`);
+        parts.push(`Pri=${user.privilege}`);
+
+        const commandStr = `DATA USER ${parts.join("\t")}`;
+        const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+        await storage.createCommand(deviceSerial, cmdId, commandStr);
+        await storage.updateDeviceUserSyncStatus(userId, deviceSerial);
+        queued++;
+      }
+
+      log(
+        `[USERS] ${queued} users queued for sync to device ${deviceSerial}`,
+        "users",
+      );
+      res.json({
+        message: `${queued} usuario(s) encolados para enviar al dispositivo ${deviceSerial}`,
+        queued,
+      });
+    },
+  );
 
   app.delete("/api/commands", async (_req: Request, res: Response) => {
     await storage.clearCommandHistory();
@@ -1173,8 +1586,15 @@ export async function registerRoutes(
     const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     try {
-      const cmd = await storage.createCommand(deviceSerial, cmdId, rawCommand.trim());
-      log(`[CMD] Raw command queued for ${deviceSerial}: ${rawCommand.trim()}`, "commands");
+      const cmd = await storage.createCommand(
+        deviceSerial,
+        cmdId,
+        rawCommand.trim(),
+      );
+      log(
+        `[CMD] Raw command queued for ${deviceSerial}: ${rawCommand.trim()}`,
+        "commands",
+      );
       res.json(cmd);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1217,7 +1637,12 @@ export async function registerRoutes(
       return;
     }
     if (data.commandParams) {
-      try { JSON.parse(data.commandParams); } catch { res.status(400).json({ message: "commandParams debe ser JSON valido" }); return; }
+      try {
+        JSON.parse(data.commandParams);
+      } catch {
+        res.status(400).json({ message: "commandParams debe ser JSON valido" });
+        return;
+      }
     }
     try {
       const nextRunAt = computeNextRunAt(data);
@@ -1242,10 +1667,21 @@ export async function registerRoutes(
     }
     const updateData: any = { ...partial.data };
     if (updateData.commandParams) {
-      try { JSON.parse(updateData.commandParams); } catch { res.status(400).json({ message: "commandParams debe ser JSON valido" }); return; }
+      try {
+        JSON.parse(updateData.commandParams);
+      } catch {
+        res.status(400).json({ message: "commandParams debe ser JSON valido" });
+        return;
+      }
     }
     const merged = { ...existing, ...updateData };
-    if (updateData.scheduleType || updateData.runAt || updateData.intervalMinutes || updateData.timeOfDay || updateData.daysOfWeek) {
+    if (
+      updateData.scheduleType ||
+      updateData.runAt ||
+      updateData.intervalMinutes ||
+      updateData.timeOfDay ||
+      updateData.daysOfWeek
+    ) {
       updateData.nextRunAt = computeNextRunAt(merged);
     }
     const task = await storage.updateScheduledTask(id, updateData);
@@ -1266,10 +1702,15 @@ export async function registerRoutes(
 
       for (const task of dueTasks) {
         try {
-          const params = task.commandParams ? JSON.parse(task.commandParams) : undefined;
+          const params = task.commandParams
+            ? JSON.parse(task.commandParams)
+            : undefined;
           const commandStr = buildCommandString(task.commandType, params);
           if (!commandStr) {
-            log(`[Scheduler] Invalid command for task "${task.name}": ${task.commandType}`, "scheduler");
+            log(
+              `[Scheduler] Invalid command for task "${task.name}": ${task.commandType}`,
+              "scheduler",
+            );
             continue;
           }
 
@@ -1286,13 +1727,22 @@ export async function registerRoutes(
           for (const serial of targetSerials) {
             const cmdId = `CMD_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
             await storage.createCommand(serial, cmdId, commandStr);
-            log(`[Scheduler] Task "${task.name}" executed: ${commandStr} -> ${serial}`, "scheduler");
+            log(
+              `[Scheduler] Task "${task.name}" executed: ${commandStr} -> ${serial}`,
+              "scheduler",
+            );
           }
 
-          const nextRunAt = task.scheduleType === "one_time" ? null : computeNextRunAt(task, now);
+          const nextRunAt =
+            task.scheduleType === "one_time"
+              ? null
+              : computeNextRunAt(task, now);
           await storage.markScheduledTaskRun(task.id, now, nextRunAt);
         } catch (err: any) {
-          log(`[Scheduler] Error executing task "${task.name}": ${err.message}`, "scheduler");
+          log(
+            `[Scheduler] Error executing task "${task.name}": ${err.message}`,
+            "scheduler",
+          );
         }
       }
     } catch (err: any) {
