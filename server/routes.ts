@@ -274,7 +274,7 @@ export async function registerRoutes(
     rolling: true,
     proxy: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: "auto",
       httpOnly: true,
       sameSite: "lax",
       path: "/",
