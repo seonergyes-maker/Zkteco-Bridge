@@ -4,7 +4,6 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 
 const app = express();
-app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
 declare module "http" {
@@ -34,16 +33,6 @@ export function log(message: string, source = "express") {
 
   console.log(`${formattedTime} [${source}] ${message}`);
 }
-
-app.use((req, _res, next) => {
-  console.log("---- REQUEST ----");
-  console.log("URL:", req.method, req.originalUrl);
-  console.log("Host:", req.headers.host);
-  console.log("Proto:", req.protocol);
-  console.log("X-Forwarded-Proto:", req.headers["x-forwarded-proto"]);
-  console.log("Cookie:", req.headers.cookie);
-  next();
-});
 
 app.use((req, res, next) => {
   const start = Date.now();
