@@ -307,7 +307,7 @@ async function forwardEvent(event: any) {
 
   for (let attempt = 0; attempt < retryAttempts; attempt++) {
     try {
-      log(`[FORWARD] Attempt ${attempt + 1}/${retryAttempts} for event ${event.id} -> ${client.oracleApiUrl}`, "oracle");
+      log(`[FORWARD] Attempt ${attempt + 1}/${retryAttempts} for event ${event.id} -> ${client.oracleApiUrl} | body: ${body}`, "oracle");
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
@@ -315,23 +315,47 @@ async function forwardEvent(event: any) {
       });
 
       const responseText = await response.text();
-      log(`[FORWARD] Response ${response.status}: ${responseText.substring(0, 200)}`, "oracle");
+      log(`[FORWARD] HTTP ${response.status} | ${responseText.substring(0, 500)}`, "oracle");
 
-      if (response.ok) {
+      if (!response.ok) {
+        if (attempt === retryAttempts - 1) {
+          await storage.markEventForwardError(event.id, `HTTP ${response.status}: ${responseText}`);
+        }
+        continue;
+      }
+
+      let oracleResponse: { resultado?: string; error?: number; mensaje?: string };
+      try {
+        oracleResponse = JSON.parse(responseText);
+      } catch {
+        if (attempt === retryAttempts - 1) {
+          await storage.markEventForwardError(event.id, `Respuesta no JSON: ${responseText.substring(0, 200)}`);
+        }
+        continue;
+      }
+
+      if (oracleResponse.resultado === "OK") {
+        log(`[FORWARD] OK event ${event.id}: ${oracleResponse.mensaje}`, "oracle");
         await storage.markEventForwarded(event.id);
         return;
       }
 
+      const errorMsg = `Oracle error ${oracleResponse.error}: ${oracleResponse.mensaje}`;
+      log(`[FORWARD] KO event ${event.id}: ${errorMsg}`, "oracle");
+
+      const noRetryErrors = [1, 3, 5];
+      if (noRetryErrors.includes(oracleResponse.error || 0)) {
+        await storage.markEventForwardError(event.id, errorMsg);
+        return;
+      }
+
       if (attempt === retryAttempts - 1) {
-        await storage.markEventForwardError(
-          event.id,
-          `HTTP ${response.status}: ${responseText}`,
-        );
+        await storage.markEventForwardError(event.id, errorMsg);
       }
     } catch (err: any) {
-      log(`[FORWARD] Error: ${err.message}`, "oracle");
+      log(`[FORWARD] Network error event ${event.id}: ${err.message}`, "oracle");
       if (attempt === retryAttempts - 1) {
-        await storage.markEventForwardError(event.id, err.message);
+        await storage.markEventForwardError(event.id, `Error de conexion: ${err.message}`);
       }
     }
 
@@ -1349,17 +1373,23 @@ export async function registerRoutes(
           headers,
           body,
         });
-        if (response.ok) {
-          res.json({ success: true });
-        } else {
-          const text = await response.text();
-          res.json({
-            success: false,
-            error: `HTTP ${response.status}: ${text.substring(0, 200)}`,
-          });
+        const responseText = await response.text();
+        if (!response.ok) {
+          res.json({ success: false, error: `HTTP ${response.status}: ${responseText.substring(0, 200)}` });
+          return;
+        }
+        try {
+          const oracleRes = JSON.parse(responseText);
+          if (oracleRes.resultado === "OK") {
+            res.json({ success: true, message: oracleRes.mensaje });
+          } else {
+            res.json({ success: false, error: `Oracle error ${oracleRes.error}: ${oracleRes.mensaje}` });
+          }
+        } catch {
+          res.json({ success: false, error: `Respuesta no JSON: ${responseText.substring(0, 200)}` });
         }
       } catch (err: any) {
-        res.json({ success: false, error: err.message });
+        res.json({ success: false, error: `Error de conexion: ${err.message}` });
       }
     },
   );
