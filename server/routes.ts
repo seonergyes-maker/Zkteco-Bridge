@@ -522,6 +522,9 @@ export async function registerRoutes(
 
   app.get("/api/auth/session", async (req: Request, res: Response) => {
     log(`[Session Check] sessionID=${req.sessionID}, userId=${req.session.userId || "NONE"}, cookie-header=${req.headers.cookie ? "PRESENT" : "MISSING"}, proto=${req.protocol}, x-fwd-proto=${req.headers["x-forwarded-proto"] || "NONE"}`, "auth");
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
     if (req.session.userId) {
       const user = await storage.getAdminUserById(req.session.userId);
       if (user && user.active) {
