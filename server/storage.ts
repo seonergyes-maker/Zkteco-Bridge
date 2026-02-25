@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 import {
   clients, devices, attendanceEvents, operationLogs, deviceCommands, scheduledTasks, deviceUsers,
@@ -38,6 +38,7 @@ export interface IStorage {
   createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent>;
   markEventForwarded(id: number): Promise<void>;
   markEventForwardError(id: number, error: string): Promise<void>;
+  getEventTimestampString(id: number): Promise<string | null>;
   deleteAllEvents(): Promise<void>;
 
   createOperationLog(deviceSerial: string, logType: string, content: string): Promise<void>;
@@ -227,6 +228,14 @@ export class DatabaseStorage implements IStorage {
 
   async markEventForwardError(id: number, error: string): Promise<void> {
     await db.update(attendanceEvents).set({ forwardError: error }).where(eq(attendanceEvents.id, id));
+  }
+
+  async getEventTimestampString(id: number): Promise<string | null> {
+    const [rows] = await pool.query(
+      "SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i:%s') as ts FROM attendance_events WHERE id = ?",
+      [id]
+    ) as any;
+    return rows[0]?.ts || null;
   }
 
   async deleteAllEvents(): Promise<void> {

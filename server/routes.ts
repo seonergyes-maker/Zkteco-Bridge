@@ -294,18 +294,32 @@ async function forwardEvent(event: any) {
       ? event.timestamp
       : new Date(event.timestamp);
 
-  let fechaHora: string;
+  let fechaHora: string | null = null;
+  let fechaSource = "unknown";
+
   if (event.rawData) {
     const rawParts = event.rawData.split("\t");
     const rawTime = rawParts[1]?.trim();
     if (rawTime && /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(rawTime)) {
       fechaHora = rawTime;
-    } else {
-      fechaHora = formatOracleTimestamp(eventTimestamp);
+      fechaSource = "rawData";
     }
-  } else {
-    fechaHora = formatOracleTimestamp(eventTimestamp);
   }
+
+  if (!fechaHora) {
+    const dbTimestamp = await storage.getEventTimestampString(event.id);
+    if (dbTimestamp) {
+      fechaHora = dbTimestamp;
+      fechaSource = "MySQL-DATE_FORMAT";
+    }
+  }
+
+  if (!fechaHora) {
+    fechaHora = formatOracleTimestamp(eventTimestamp);
+    fechaSource = "formatOracleTimestamp-fallback";
+  }
+
+  log(`[FORWARD] Event ${event.id} fecha_hora=${fechaHora} (source: ${fechaSource}) | rawData=${event.rawData || "N/A"} | DB-timestamp=${event.timestamp}`, "oracle");
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
