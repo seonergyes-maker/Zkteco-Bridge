@@ -39,6 +39,7 @@ export interface IStorage {
   markEventForwarded(id: number): Promise<void>;
   markEventForwardError(id: number, error: string): Promise<void>;
   getEventTimestampString(id: number): Promise<string | null>;
+  markAllEventsForwarded(): Promise<number>;
   deleteAllEvents(): Promise<void>;
 
   createOperationLog(deviceSerial: string, logType: string, content: string): Promise<void>;
@@ -228,6 +229,13 @@ export class DatabaseStorage implements IStorage {
 
   async markEventForwardError(id: number, error: string): Promise<void> {
     await db.update(attendanceEvents).set({ forwardError: error }).where(eq(attendanceEvents.id, id));
+  }
+
+  async markAllEventsForwarded(): Promise<number> {
+    const [result] = await pool.query(
+      "UPDATE attendance_events SET forwarded = 1, forwarded_at = NOW(), forward_error = NULL WHERE forwarded = 0"
+    ) as any;
+    return result?.affectedRows || 0;
   }
 
   async getEventTimestampString(id: number): Promise<string | null> {

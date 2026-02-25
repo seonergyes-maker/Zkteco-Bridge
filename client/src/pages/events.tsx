@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarClock, Search, CheckCircle, Clock, Send, RefreshCw, ArrowDownLeft, ArrowUpRight, Building2 } from "lucide-react";
+import { CalendarClock, Search, CheckCircle, Clock, Send, RefreshCw, ArrowDownLeft, ArrowUpRight, Building2, SkipForward } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ATTENDANCE_STATUS, VERIFY_MODE, type AttendanceEvent, type Client, type Device, type DeviceUser } from "@shared/schema";
@@ -78,6 +78,22 @@ export default function Events() {
     },
   });
 
+  const skipMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/events/mark-all-forwarded");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events/pending-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      toast({ title: "Eventos omitidos", description: `${data.count} eventos marcados como reenviados sin enviar a la API` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   function getClientName(deviceSerial: string): string {
     const device = devicesList?.find(d => d.serialNumber === deviceSerial);
     if (!device) return "-";
@@ -124,15 +140,30 @@ export default function Events() {
           <p className="text-muted-foreground">Historial de todos los registros recibidos</p>
         </div>
         {forwardingActive && (
-          <Button
-            variant="outline"
-            onClick={() => retryMutation.mutate()}
-            disabled={retryMutation.isPending}
-            data-testid="button-retry-forward"
-          >
-            <Send className="w-4 h-4 mr-2" />
-            {retryMutation.isPending ? "Reenviando..." : "Reenviar pendientes"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => retryMutation.mutate()}
+              disabled={retryMutation.isPending}
+              data-testid="button-retry-forward"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {retryMutation.isPending ? "Reenviando..." : "Reenviar pendientes"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (confirm("Esto marcara todos los eventos pendientes como reenviados SIN enviarlos a la API. ¿Continuar?")) {
+                  skipMutation.mutate();
+                }
+              }}
+              disabled={skipMutation.isPending}
+              data-testid="button-skip-forward"
+            >
+              <SkipForward className="w-4 h-4 mr-2" />
+              {skipMutation.isPending ? "Procesando..." : "Omitir pendientes"}
+            </Button>
+          </div>
         )}
       </div>
 

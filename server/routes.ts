@@ -1363,6 +1363,12 @@ export async function registerRoutes(
     },
   );
 
+  app.post("/api/events/mark-all-forwarded", async (_req: Request, res: Response) => {
+    const count = await storage.markAllEventsForwarded();
+    log(`[EVENTS] Marked ${count} pending events as forwarded (skipped)`, "events");
+    res.json({ message: `${count} eventos marcados como reenviados`, count });
+  });
+
   app.delete("/api/events", async (_req: Request, res: Response) => {
     await storage.deleteAllEvents();
     res.json({ message: "Todos los eventos de fichaje han sido eliminados" });
