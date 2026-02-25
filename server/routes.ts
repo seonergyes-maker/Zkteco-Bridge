@@ -294,36 +294,42 @@ async function forwardEvent(event: any) {
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "X-Client-Id": client.clientId,
-    "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
-    "X-Pin": event.pin,
-    "X-Timestamp": formatOracleTimestamp(eventTimestamp),
-    "X-Incidence-Code": String(event.status),
-    "X-Device-Serial": event.deviceSerial,
-    "X-Latitude": "0",
-    "X-Longitude": "0",
+    "api-key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
+    "id-cliente": client.clientId,
   };
+
+  const body = JSON.stringify({
+    id_presencia: event.pin,
+    fecha_hora: formatOracleTimestamp(eventTimestamp),
+    incidencia: String(event.status),
+    fichador: event.deviceSerial,
+  });
 
   for (let attempt = 0; attempt < retryAttempts; attempt++) {
     try {
+      log(`[FORWARD] Attempt ${attempt + 1}/${retryAttempts} for event ${event.id} -> ${client.oracleApiUrl}`, "oracle");
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
+        body,
       });
+
+      const responseText = await response.text();
+      log(`[FORWARD] Response ${response.status}: ${responseText.substring(0, 200)}`, "oracle");
 
       if (response.ok) {
         await storage.markEventForwarded(event.id);
         return;
       }
 
-      const errorText = await response.text();
       if (attempt === retryAttempts - 1) {
         await storage.markEventForwardError(
           event.id,
-          `HTTP ${response.status}: ${errorText}`,
+          `HTTP ${response.status}: ${responseText}`,
         );
       }
     } catch (err: any) {
+      log(`[FORWARD] Error: ${err.message}`, "oracle");
       if (attempt === retryAttempts - 1) {
         await storage.markEventForwardError(event.id, err.message);
       }
@@ -1329,18 +1335,19 @@ export async function registerRoutes(
         const now = new Date();
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
-          "X-Client-Id": client.clientId,
-          "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
-          "X-Pin": "TEST",
-          "X-Timestamp": formatOracleTimestamp(now),
-          "X-Incidence-Code": "0",
-          "X-Device-Serial": "TEST-DEVICE",
-          "X-Latitude": "0",
-          "X-Longitude": "0",
+          "api-key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
+          "id-cliente": client.clientId,
         };
+        const body = JSON.stringify({
+          id_presencia: "TEST",
+          fecha_hora: formatOracleTimestamp(now),
+          incidencia: "0",
+          fichador: "TEST-DEVICE",
+        });
         const response = await fetch(client.oracleApiUrl, {
           method: "POST",
           headers,
+          body,
         });
         if (response.ok) {
           res.json({ success: true });
