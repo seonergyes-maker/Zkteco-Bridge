@@ -201,6 +201,16 @@ function maskClientForResponse(client: any) {
   };
 }
 
+function formatOracleTimestamp(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${y}-${m}-${d} ${h}:${mi}:${s}`;
+}
+
 async function forwardEvent(event: any) {
   const client = await storage.getClientByDeviceSerial(event.deviceSerial);
   if (!client || !client.forwardingEnabled || !client.oracleApiUrl) return;
@@ -208,25 +218,27 @@ async function forwardEvent(event: any) {
   const retryAttempts = client.retryAttempts || 3;
   const retryDelayMs = client.retryDelayMs || 5000;
 
+  const eventTimestamp = event.timestamp instanceof Date
+    ? event.timestamp
+    : new Date(event.timestamp);
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Client-Id": client.clientId,
+    "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
+    "X-Pin": event.pin,
+    "X-Timestamp": formatOracleTimestamp(eventTimestamp),
+    "X-Incidence-Code": String(event.status),
+    "X-Device-Serial": event.deviceSerial,
+    "X-Latitude": "0",
+    "X-Longitude": "0",
+  };
+
   for (let attempt = 0; attempt < retryAttempts; attempt++) {
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (client.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${decrypt(client.oracleApiKey)}`;
-      }
-
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          deviceSerial: event.deviceSerial,
-          clientId: client.clientId,
-          pin: event.pin,
-          timestamp: event.timestamp,
-          status: event.status,
-          verify: event.verify,
-          workCode: event.workCode,
-        }),
       });
 
       if (response.ok) {
@@ -926,14 +938,21 @@ export async function registerRoutes(
       return;
     }
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (client.oracleApiKey) {
-        headers["Authorization"] = `Bearer ${decrypt(client.oracleApiKey)}`;
-      }
+      const now = new Date();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "X-Client-Id": client.clientId,
+        "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
+        "X-Pin": "TEST",
+        "X-Timestamp": formatOracleTimestamp(now),
+        "X-Incidence-Code": "0",
+        "X-Device-Serial": "TEST-DEVICE",
+        "X-Latitude": "0",
+        "X-Longitude": "0",
+      };
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
-        body: JSON.stringify({ test: true, clientId: client.clientId, timestamp: new Date().toISOString() }),
       });
       if (response.ok) {
         res.json({ success: true });
