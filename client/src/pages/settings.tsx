@@ -36,7 +36,7 @@ export default function SettingsPage() {
   const [showPasswords, setShowPasswords] = useState(false);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-  const pushEndpoint = `${baseUrl}/iclock/cdata`;
+  const pushEndpoint = `${baseUrl}`;
 
   function copyEndpoint() {
     navigator.clipboard.writeText(pushEndpoint);

@@ -78,7 +78,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4">
         <div className="text-xs text-muted-foreground">
-          Middleware ZKTeco
+          Middleware V2.0.1
         </div>
       </SidebarFooter>
     </Sidebar>
