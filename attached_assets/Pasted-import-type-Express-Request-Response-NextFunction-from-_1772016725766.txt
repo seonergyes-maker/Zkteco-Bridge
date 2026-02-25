@@ -201,16 +201,6 @@ function maskClientForResponse(client: any) {
   };
 }
 
-function formatOracleTimestamp(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const mi = String(date.getMinutes()).padStart(2, "0");
-  const s = String(date.getSeconds()).padStart(2, "0");
-  return `${y}-${m}-${d} ${h}:${mi}:${s}`;
-}
-
 async function forwardEvent(event: any) {
   const client = await storage.getClientByDeviceSerial(event.deviceSerial);
   if (!client || !client.forwardingEnabled || !client.oracleApiUrl) return;
@@ -218,27 +208,25 @@ async function forwardEvent(event: any) {
   const retryAttempts = client.retryAttempts || 3;
   const retryDelayMs = client.retryDelayMs || 5000;
 
-  const eventTimestamp = event.timestamp instanceof Date
-    ? event.timestamp
-    : new Date(event.timestamp);
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "X-Client-Id": client.clientId,
-    "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
-    "X-Pin": event.pin,
-    "X-Timestamp": formatOracleTimestamp(eventTimestamp),
-    "X-Incidence-Code": String(event.status),
-    "X-Device-Serial": event.deviceSerial,
-    "X-Latitude": "0",
-    "X-Longitude": "0",
-  };
-
   for (let attempt = 0; attempt < retryAttempts; attempt++) {
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (client.oracleApiKey) {
+        headers["Authorization"] = `Bearer ${decrypt(client.oracleApiKey)}`;
+      }
+
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
+        body: JSON.stringify({
+          deviceSerial: event.deviceSerial,
+          clientId: client.clientId,
+          pin: event.pin,
+          timestamp: event.timestamp,
+          status: event.status,
+          verify: event.verify,
+          workCode: event.workCode,
+        }),
       });
 
       if (response.ok) {
@@ -267,20 +255,21 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  // Session setup
   app.use(session({
-    secret: process.env.SESSION_SECRET || "fallback-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    rolling: true,
-    proxy: true,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 8 * 60 * 60 * 1000,
-    },
-  }));
+  secret: process.env.SESSION_SECRET || "fallback-secret-key",
+  resave: false,
+  saveUninitialized: false,
+  rolling: true,
+  proxy: true, // ayuda detrás de Passenger/proxy
+  cookie: {
+    secure: process.env.NODE_ENV === "production", // true en cPanel https
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 8 * 60 * 60 * 1000,
+  },
+}));
 
   function requireAuth(req: Request, res: Response, next: NextFunction) {
     if (req.session.userId) {
@@ -339,19 +328,22 @@ export async function registerRoutes(
       return;
     }
 
-    req.session.userId = user.id;
-    req.session.username = user.username;
-    await storage.createAccessLog(username, ip, true, "Login exitoso");
-    log(`[Auth] Successful login: "${username}" from ${ip}`, "auth");
+req.session.userId = user.id;
+req.session.username = user.username;
 
-    req.session.save((err) => {
-      if (err) {
-        log(`[Auth] Session save error: ${err.message}`, "auth");
-        res.status(500).json({ message: "Error al guardar la sesion" });
-        return;
-      }
-      res.json({ username: user.username, id: user.id });
-    });
+req.session.save(async (err) => {
+  if (err) {
+    console.error("[Auth] Session save error:", err);
+    return res.status(500).json({ message: "Error de sesion" });
+  }
+
+  await storage.createAccessLog(username, ip, true, "Login exitoso");
+  log(`[Auth] Successful login: "${username}" from ${ip}`, "auth");
+  console.log("[Auth] Session creada:", req.sessionID, req.session);
+
+  res.json({ username: user.username, id: user.id });
+});
+return;
   });
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
@@ -932,11 +924,6 @@ export async function registerRoutes(
     res.json({ forwarded, total: pending.length });
   });
 
-  app.delete("/api/events", async (_req: Request, res: Response) => {
-    await storage.deleteAllEvents();
-    res.json({ message: "Todos los eventos de fichaje han sido eliminados" });
-  });
-
   app.post("/api/clients/:id/test-forwarding", async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     const client = await storage.getClient(id);
@@ -949,21 +936,14 @@ export async function registerRoutes(
       return;
     }
     try {
-      const now = new Date();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        "X-Client-Id": client.clientId,
-        "X-Api-Key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
-        "X-Pin": "TEST",
-        "X-Timestamp": formatOracleTimestamp(now),
-        "X-Incidence-Code": "0",
-        "X-Device-Serial": "TEST-DEVICE",
-        "X-Latitude": "0",
-        "X-Longitude": "0",
-      };
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (client.oracleApiKey) {
+        headers["Authorization"] = `Bearer ${decrypt(client.oracleApiKey)}`;
+      }
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
+        body: JSON.stringify({ test: true, clientId: client.clientId, timestamp: new Date().toISOString() }),
       });
       if (response.ok) {
         res.json({ success: true });

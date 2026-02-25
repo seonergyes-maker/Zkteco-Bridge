@@ -4,8 +4,10 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 
 const app = express();
-app.set("trust proxy", 1);
 const httpServer = createServer(app);
+
+// ✅ Importante detrás de cPanel/Passenger (proxy)
+app.set("trust proxy", 1);
 
 declare module "http" {
   interface IncomingMessage {
@@ -35,6 +37,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// 🔎 Debug temporal (puedes quitarlo luego)
 app.use((req, _res, next) => {
   console.log("---- REQUEST ----");
   console.log("URL:", req.method, req.originalUrl);
