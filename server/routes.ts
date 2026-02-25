@@ -1356,6 +1356,13 @@ export async function registerRoutes(
         return;
       }
       try {
+        const devices = await storage.getDevicesByClientId(id);
+        const activeDevice = devices.find(d => d.active);
+        if (!activeDevice) {
+          res.json({ success: false, error: "No hay dispositivos activos para este cliente. Necesario para enviar el serial real a Oracle." });
+          return;
+        }
+
         const now = new Date();
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -1363,17 +1370,19 @@ export async function registerRoutes(
           "id-cliente": client.clientId,
         };
         const body = JSON.stringify({
-          id_presencia: "TEST",
+          id_presencia: "0",
           fecha_hora: formatOracleTimestamp(now),
           incidencia: "0",
-          fichador: "TEST-DEVICE",
+          fichador: activeDevice.serialNumber,
         });
+        log(`[TEST-FORWARD] Client ${client.name} -> ${client.oracleApiUrl} | serial: ${activeDevice.serialNumber} | body: ${body}`, "oracle");
         const response = await fetch(client.oracleApiUrl, {
           method: "POST",
           headers,
           body,
         });
         const responseText = await response.text();
+        log(`[TEST-FORWARD] HTTP ${response.status} | ${responseText.substring(0, 500)}`, "oracle");
         if (!response.ok) {
           res.json({ success: false, error: `HTTP ${response.status}: ${responseText.substring(0, 200)}` });
           return;
@@ -1382,6 +1391,8 @@ export async function registerRoutes(
           const oracleRes = JSON.parse(responseText);
           if (oracleRes.resultado === "OK") {
             res.json({ success: true, message: oracleRes.mensaje });
+          } else if (oracleRes.error === 4 && oracleRes.mensaje?.includes("ERR_TRABAJADOR")) {
+            res.json({ success: true, message: "Conexion OK. El fichador fue aceptado pero el trabajador de prueba no existe (esto es normal en un test)." });
           } else {
             res.json({ success: false, error: `Oracle error ${oracleRes.error}: ${oracleRes.mensaje}` });
           }
