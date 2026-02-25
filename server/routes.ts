@@ -705,16 +705,16 @@ export async function registerRoutes(
     }
 
     const stamps = device || {
-      attlogStamp: "0",
-      operlogStamp: "0",
-      attphotoStamp: "0",
+      attlogStamp: "1772036642",
+      operlogStamp: "1772036642",
+      attphotoStamp: "1772036642",
     };
 
     const responseLines = [
       `GET OPTION FROM: ${sn}`,
-      `ATTLOGStamp=${stamps.attlogStamp || "0"}`,
-      `OPERLOGStamp=${stamps.operlogStamp || "0"}`,
-      `ATTPHOTOStamp=${stamps.attphotoStamp || "0"}`,
+      `ATTLOGStamp=${stamps.attlogStamp || "1772036642"}`,
+      `OPERLOGStamp=${stamps.operlogStamp || "1772036642"}`,
+      `ATTPHOTOStamp=${stamps.attphotoStamp || "1772036642"}`,
       `ErrorDelay=60`,
       `Delay=30`,
       `TransTimes=00:00;14:05`,
