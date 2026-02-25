@@ -256,8 +256,10 @@ function parseZktecoTimestamp(timeStr: string): Date | null {
   );
   if (!match) return null;
   const [, year, month, day, hour, min, sec] = match;
-  const isoStr = `${year}-${month}-${day}T${hour}:${min}:${sec}.000Z`;
-  const d = new Date(isoStr);
+  const d = new Date(
+    parseInt(year), parseInt(month) - 1, parseInt(day),
+    parseInt(hour), parseInt(min), parseInt(sec)
+  );
   if (isNaN(d.getTime())) return null;
   return d;
 }
@@ -292,6 +294,19 @@ async function forwardEvent(event: any) {
       ? event.timestamp
       : new Date(event.timestamp);
 
+  let fechaHora: string;
+  if (event.rawData) {
+    const rawParts = event.rawData.split("\t");
+    const rawTime = rawParts[1]?.trim();
+    if (rawTime && /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(rawTime)) {
+      fechaHora = rawTime;
+    } else {
+      fechaHora = formatOracleTimestamp(eventTimestamp);
+    }
+  } else {
+    fechaHora = formatOracleTimestamp(eventTimestamp);
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "api-key": client.oracleApiKey ? decrypt(client.oracleApiKey) : "",
@@ -300,7 +315,7 @@ async function forwardEvent(event: any) {
 
   const body = JSON.stringify({
     id_presencia: event.pin,
-    fecha_hora: formatOracleTimestamp(eventTimestamp),
+    fecha_hora: fechaHora,
     incidencia: String(event.status),
     fichador: event.deviceSerial,
   });
