@@ -6,6 +6,7 @@ const __dirname = dirname(__filename);
 
 process.env.NODE_ENV = "production";
 process.env.PORT = process.env.PORT || "3000";
+process.env.TZ = process.env.TZ || "Europe/Madrid";
 
 const entry = join(__dirname, "dist", "index.cjs");
 
