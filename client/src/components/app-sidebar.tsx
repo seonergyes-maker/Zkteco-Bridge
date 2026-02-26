@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import type { AttendanceEvent } from "@shared/schema";
 
 const menuItems = [
@@ -30,6 +31,14 @@ const menuItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const [clock, setClock] = useState(() => new Date().toLocaleTimeString("es-ES"));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setClock(new Date().toLocaleTimeString("es-ES"));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: pendingCount } = useQuery<number>({
     queryKey: ["/api/events/pending-count"],
@@ -45,7 +54,7 @@ export function AppSidebar() {
           </div>
           <div>
             <h2 className="text-sm font-semibold tracking-tight">DCrono Hub</h2>
-            <p className="text-xs text-muted-foreground">PUSH SDK v2.0.1</p>
+            <p className="text-xs text-muted-foreground">PUSH SDK v2.0.2</p>
           </div>
         </div>
       </SidebarHeader>
@@ -77,8 +86,9 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4">
-        <div className="text-xs text-muted-foreground">
-          Middleware V2.0.1
+        <div className="text-xs text-muted-foreground space-y-0.5">
+          <div>Middleware V2.0.2</div>
+          <div className="font-mono" data-testid="text-system-clock">{clock}</div>
         </div>
       </SidebarFooter>
     </Sidebar>

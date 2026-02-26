@@ -768,7 +768,7 @@ export async function registerRoutes(
       `Encrypt=0`,
       `TimeZone=${device?.timezone ?? 1}`,
       `DSTF=1`,
-      `ServerVer=2.0.1`,
+      `ServerVer=2.0.2`,
     ];
 
     const responseBody = responseLines.join("\n") + "\n";
