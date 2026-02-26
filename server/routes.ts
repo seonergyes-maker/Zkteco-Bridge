@@ -257,8 +257,12 @@ function parseZktecoTimestamp(timeStr: string): Date | null {
   if (!match) return null;
   const [, year, month, day, hour, min, sec] = match;
   const d = new Date(
-    parseInt(year), parseInt(month) - 1, parseInt(day),
-    parseInt(hour), parseInt(min), parseInt(sec)
+    parseInt(year),
+    parseInt(month) - 1,
+    parseInt(day),
+    parseInt(hour),
+    parseInt(min),
+    parseInt(sec),
   );
   if (isNaN(d.getTime())) return null;
   return d;
@@ -319,7 +323,10 @@ async function forwardEvent(event: any) {
     fechaSource = "formatOracleTimestamp-fallback";
   }
 
-  log(`[FORWARD] Event ${event.id} fecha_hora=${fechaHora} (source: ${fechaSource}) | rawData=${event.rawData || "N/A"} | DB-timestamp=${event.timestamp}`, "oracle");
+  log(
+    `[FORWARD] Event ${event.id} fecha_hora=${fechaHora} (source: ${fechaSource}) | rawData=${event.rawData || "N/A"} | DB-timestamp=${event.timestamp}`,
+    "oracle",
+  );
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -330,13 +337,16 @@ async function forwardEvent(event: any) {
   const body = JSON.stringify({
     id_presencia: event.pin,
     fecha_hora: fechaHora,
-    incidencia: String(event.status),
+    incidencia: String(Number(event.workCode ?? 0)),
     fichador: event.deviceSerial,
   });
 
   for (let attempt = 0; attempt < retryAttempts; attempt++) {
     try {
-      log(`[FORWARD] Attempt ${attempt + 1}/${retryAttempts} for event ${event.id} -> ${client.oracleApiUrl} | body: ${body}`, "oracle");
+      log(
+        `[FORWARD] Attempt ${attempt + 1}/${retryAttempts} for event ${event.id} -> ${client.oracleApiUrl} | body: ${body}`,
+        "oracle",
+      );
       const response = await fetch(client.oracleApiUrl, {
         method: "POST",
         headers,
@@ -344,27 +354,43 @@ async function forwardEvent(event: any) {
       });
 
       const responseText = await response.text();
-      log(`[FORWARD] HTTP ${response.status} | ${responseText.substring(0, 500)}`, "oracle");
+      log(
+        `[FORWARD] HTTP ${response.status} | ${responseText.substring(0, 500)}`,
+        "oracle",
+      );
 
       if (!response.ok) {
         if (attempt === retryAttempts - 1) {
-          await storage.markEventForwardError(event.id, `HTTP ${response.status}: ${responseText}`);
+          await storage.markEventForwardError(
+            event.id,
+            `HTTP ${response.status}: ${responseText}`,
+          );
         }
         continue;
       }
 
-      let oracleResponse: { resultado?: string; error?: number; mensaje?: string };
+      let oracleResponse: {
+        resultado?: string;
+        error?: number;
+        mensaje?: string;
+      };
       try {
         oracleResponse = JSON.parse(responseText);
       } catch {
         if (attempt === retryAttempts - 1) {
-          await storage.markEventForwardError(event.id, `Respuesta no JSON: ${responseText.substring(0, 200)}`);
+          await storage.markEventForwardError(
+            event.id,
+            `Respuesta no JSON: ${responseText.substring(0, 200)}`,
+          );
         }
         continue;
       }
 
       if (oracleResponse.resultado === "OK") {
-        log(`[FORWARD] OK event ${event.id}: ${oracleResponse.mensaje}`, "oracle");
+        log(
+          `[FORWARD] OK event ${event.id}: ${oracleResponse.mensaje}`,
+          "oracle",
+        );
         await storage.markEventForwarded(event.id);
         return;
       }
@@ -382,9 +408,15 @@ async function forwardEvent(event: any) {
         await storage.markEventForwardError(event.id, errorMsg);
       }
     } catch (err: any) {
-      log(`[FORWARD] Network error event ${event.id}: ${err.message}`, "oracle");
+      log(
+        `[FORWARD] Network error event ${event.id}: ${err.message}`,
+        "oracle",
+      );
       if (attempt === retryAttempts - 1) {
-        await storage.markEventForwardError(event.id, `Error de conexion: ${err.message}`);
+        await storage.markEventForwardError(
+          event.id,
+          `Error de conexion: ${err.message}`,
+        );
       }
     }
 
@@ -398,11 +430,15 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
-  const cookieSecure = process.env.COOKIE_SECURE === "false"
-    ? false
-    : process.env.NODE_ENV === "production";
+  const cookieSecure =
+    process.env.COOKIE_SECURE === "false"
+      ? false
+      : process.env.NODE_ENV === "production";
 
-  log(`[Session] cookie.secure=${cookieSecure}, NODE_ENV=${process.env.NODE_ENV}, trust proxy=${app.get("trust proxy")}`, "auth");
+  log(
+    `[Session] cookie.secure=${cookieSecure}, NODE_ENV=${process.env.NODE_ENV}, trust proxy=${app.get("trust proxy")}`,
+    "auth",
+  );
 
   app.use(
     session({
@@ -430,19 +466,23 @@ export async function registerRoutes(
         "x-forwarded-proto": req.headers["x-forwarded-proto"] || "NOT SET",
         "x-forwarded-for": req.headers["x-forwarded-for"] || "NOT SET",
         host: req.headers.host || "NOT SET",
-        cookie: req.headers.cookie ? "PRESENT (" + req.headers.cookie.length + " chars)" : "NOT SET",
+        cookie: req.headers.cookie
+          ? "PRESENT (" + req.headers.cookie.length + " chars)"
+          : "NOT SET",
       },
       session: {
         id: req.sessionID,
         userId: req.session.userId || null,
         username: req.session.username || null,
-        cookie: req.session.cookie ? {
-          secure: req.session.cookie.secure,
-          httpOnly: req.session.cookie.httpOnly,
-          sameSite: req.session.cookie.sameSite,
-          maxAge: req.session.cookie.maxAge,
-          path: req.session.cookie.path,
-        } : null,
+        cookie: req.session.cookie
+          ? {
+              secure: req.session.cookie.secure,
+              httpOnly: req.session.cookie.httpOnly,
+              sameSite: req.session.cookie.sameSite,
+              maxAge: req.session.cookie.maxAge,
+              path: req.session.cookie.path,
+            }
+          : null,
       },
       env: {
         NODE_ENV: process.env.NODE_ENV,
@@ -495,11 +535,9 @@ export async function registerRoutes(
         `[Auth] Login blocked for ${username} - banned for ${remaining} more min`,
         "auth",
       );
-      res
-        .status(429)
-        .json({
-          message: `Cuenta bloqueada. Intente de nuevo en ${remaining} minutos.`,
-        });
+      res.status(429).json({
+        message: `Cuenta bloqueada. Intente de nuevo en ${remaining} minutos.`,
+      });
       return;
     }
 
@@ -515,12 +553,10 @@ export async function registerRoutes(
         `[Auth] Login blocked for IP ${ip} - too many failed attempts`,
         "auth",
       );
-      res
-        .status(429)
-        .json({
-          message:
-            "Demasiados intentos fallidos desde esta IP. Intente mas tarde.",
-        });
+      res.status(429).json({
+        message:
+          "Demasiados intentos fallidos desde esta IP. Intente mas tarde.",
+      });
       return;
     }
 
@@ -580,7 +616,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/auth/session", async (req: Request, res: Response) => {
-    log(`[Session Check] sessionID=${req.sessionID}, userId=${req.session.userId || "NONE"}, cookie-header=${req.headers.cookie ? "PRESENT" : "MISSING"}, proto=${req.protocol}, x-fwd-proto=${req.headers["x-forwarded-proto"] || "NONE"}`, "auth");
+    log(
+      `[Session Check] sessionID=${req.sessionID}, userId=${req.session.userId || "NONE"}, cookie-header=${req.headers.cookie ? "PRESENT" : "MISSING"}, proto=${req.protocol}, x-fwd-proto=${req.headers["x-forwarded-proto"] || "NONE"}`,
+      "auth",
+    );
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
@@ -615,11 +654,9 @@ export async function registerRoutes(
         return;
       }
       if (newPassword.length < 6) {
-        res
-          .status(400)
-          .json({
-            message: "La nueva contrasena debe tener al menos 6 caracteres",
-          });
+        res.status(400).json({
+          message: "La nueva contrasena debe tener al menos 6 caracteres",
+        });
         return;
       }
       const user = await storage.getAdminUserById(req.session.userId!);
@@ -1363,11 +1400,17 @@ export async function registerRoutes(
     },
   );
 
-  app.post("/api/events/mark-all-forwarded", async (_req: Request, res: Response) => {
-    const count = await storage.markAllEventsForwarded();
-    log(`[EVENTS] Marked ${count} pending events as forwarded (skipped)`, "events");
-    res.json({ message: `${count} eventos marcados como reenviados`, count });
-  });
+  app.post(
+    "/api/events/mark-all-forwarded",
+    async (_req: Request, res: Response) => {
+      const count = await storage.markAllEventsForwarded();
+      log(
+        `[EVENTS] Marked ${count} pending events as forwarded (skipped)`,
+        "events",
+      );
+      res.json({ message: `${count} eventos marcados como reenviados`, count });
+    },
+  );
 
   app.delete("/api/events", async (_req: Request, res: Response) => {
     await storage.deleteAllEvents();
@@ -1392,9 +1435,13 @@ export async function registerRoutes(
       }
       try {
         const devices = await storage.getDevicesByClientId(id);
-        const activeDevice = devices.find(d => d.active);
+        const activeDevice = devices.find((d) => d.active);
         if (!activeDevice) {
-          res.json({ success: false, error: "No hay dispositivos activos para este cliente. Necesario para enviar el serial real a Oracle." });
+          res.json({
+            success: false,
+            error:
+              "No hay dispositivos activos para este cliente. Necesario para enviar el serial real a Oracle.",
+          });
           return;
         }
 
@@ -1410,32 +1457,57 @@ export async function registerRoutes(
           incidencia: "0",
           fichador: activeDevice.serialNumber,
         });
-        log(`[TEST-FORWARD] Client ${client.name} -> ${client.oracleApiUrl} | serial: ${activeDevice.serialNumber} | body: ${body}`, "oracle");
+        log(
+          `[TEST-FORWARD] Client ${client.name} -> ${client.oracleApiUrl} | serial: ${activeDevice.serialNumber} | body: ${body}`,
+          "oracle",
+        );
         const response = await fetch(client.oracleApiUrl, {
           method: "POST",
           headers,
           body,
         });
         const responseText = await response.text();
-        log(`[TEST-FORWARD] HTTP ${response.status} | ${responseText.substring(0, 500)}`, "oracle");
+        log(
+          `[TEST-FORWARD] HTTP ${response.status} | ${responseText.substring(0, 500)}`,
+          "oracle",
+        );
         if (!response.ok) {
-          res.json({ success: false, error: `HTTP ${response.status}: ${responseText.substring(0, 200)}` });
+          res.json({
+            success: false,
+            error: `HTTP ${response.status}: ${responseText.substring(0, 200)}`,
+          });
           return;
         }
         try {
           const oracleRes = JSON.parse(responseText);
           if (oracleRes.resultado === "OK") {
             res.json({ success: true, message: oracleRes.mensaje });
-          } else if (oracleRes.error === 4 && oracleRes.mensaje?.includes("ERR_TRABAJADOR")) {
-            res.json({ success: true, message: "Conexion OK. El fichador fue aceptado pero el trabajador de prueba no existe (esto es normal en un test)." });
+          } else if (
+            oracleRes.error === 4 &&
+            oracleRes.mensaje?.includes("ERR_TRABAJADOR")
+          ) {
+            res.json({
+              success: true,
+              message:
+                "Conexion OK. El fichador fue aceptado pero el trabajador de prueba no existe (esto es normal en un test).",
+            });
           } else {
-            res.json({ success: false, error: `Oracle error ${oracleRes.error}: ${oracleRes.mensaje}` });
+            res.json({
+              success: false,
+              error: `Oracle error ${oracleRes.error}: ${oracleRes.mensaje}`,
+            });
           }
         } catch {
-          res.json({ success: false, error: `Respuesta no JSON: ${responseText.substring(0, 200)}` });
+          res.json({
+            success: false,
+            error: `Respuesta no JSON: ${responseText.substring(0, 200)}`,
+          });
         }
       } catch (err: any) {
-        res.json({ success: false, error: `Error de conexion: ${err.message}` });
+        res.json({
+          success: false,
+          error: `Error de conexion: ${err.message}`,
+        });
       }
     },
   );
@@ -1465,11 +1537,9 @@ export async function registerRoutes(
 
     const commandStr = buildCommandString(commandType, params);
     if (!commandStr) {
-      res
-        .status(400)
-        .json({
-          message: `Parametros invalidos para el comando ${commandType}`,
-        });
+      res.status(400).json({
+        message: `Parametros invalidos para el comando ${commandType}`,
+      });
       return;
     }
 
@@ -1563,11 +1633,9 @@ export async function registerRoutes(
       }
 
       if (!client.usersApiUrl) {
-        res
-          .status(400)
-          .json({
-            message: "El cliente no tiene configurada una API de usuarios",
-          });
+        res.status(400).json({
+          message: "El cliente no tiene configurada una API de usuarios",
+        });
         return;
       }
 
@@ -1584,11 +1652,9 @@ export async function registerRoutes(
 
         const response = await fetch(client.usersApiUrl, { headers });
         if (!response.ok) {
-          res
-            .status(400)
-            .json({
-              message: `Error de la API: ${response.status} ${response.statusText}`,
-            });
+          res.status(400).json({
+            message: `Error de la API: ${response.status} ${response.statusText}`,
+          });
           return;
         }
 
