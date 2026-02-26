@@ -742,16 +742,23 @@ export async function registerRoutes(
     }
 
     const stamps = device || {
-      attlogStamp: "1772036642",
-      operlogStamp: "1772036642",
-      attphotoStamp: "1772036642",
+      attlogStamp: "0",
+      operlogStamp: "0",
+      attphotoStamp: "0",
+    };
+
+    const yesterdayUnix = String(Math.floor(Date.now() / 1000) - 86400);
+
+    const resolveStamp = (stamp: string | null | undefined): string => {
+      if (!stamp || stamp === "0") return yesterdayUnix;
+      return stamp;
     };
 
     const responseLines = [
       `GET OPTION FROM: ${sn}`,
-      `ATTLOGStamp=${stamps.attlogStamp || "1772036642"}`,
-      `OPERLOGStamp=${stamps.operlogStamp || "1772036642"}`,
-      `ATTPHOTOStamp=${stamps.attphotoStamp || "1772036642"}`,
+      `ATTLOGStamp=${resolveStamp(stamps.attlogStamp)}`,
+      `OPERLOGStamp=${resolveStamp(stamps.operlogStamp)}`,
+      `ATTPHOTOStamp=${resolveStamp(stamps.attphotoStamp)}`,
       `ErrorDelay=60`,
       `Delay=30`,
       `TransTimes=00:00;14:05`,
