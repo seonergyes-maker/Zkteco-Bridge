@@ -1327,7 +1327,13 @@ export async function registerRoutes(
 
   app.patch("/api/devices/:id", async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
-    const device = await storage.updateDevice(id, req.body);
+    const body = req.body;
+    const updateData: any = {};
+    if (body.alias !== undefined) updateData.alias = body.alias || null;
+    if (body.active !== undefined) updateData.active = Boolean(body.active);
+    if (body.clientId !== undefined) updateData.clientId = parseInt(body.clientId, 10);
+    if (body.timezone !== undefined) updateData.timezone = parseInt(body.timezone, 10) || 1;
+    const device = await storage.updateDevice(id, updateData);
     if (!device) {
       res.status(404).json({ message: "Dispositivo no encontrado" });
       return;

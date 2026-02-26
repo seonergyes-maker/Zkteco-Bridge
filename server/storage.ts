@@ -150,7 +150,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateDevice(id: number, data: Partial<InsertDevice>): Promise<Device | undefined> {
-    await db.update(devices).set(data).where(eq(devices.id, id));
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (data.alias !== undefined) { fields.push("alias = ?"); values.push(data.alias); }
+    if (data.active !== undefined) { fields.push("active = ?"); values.push(data.active ? 1 : 0); }
+    if (data.clientId !== undefined) { fields.push("client_id = ?"); values.push(data.clientId); }
+    if ((data as any).timezone !== undefined) { fields.push("timezone = ?"); values.push((data as any).timezone); }
+    if (fields.length > 0) {
+      values.push(id);
+      await pool.query(`UPDATE devices SET ${fields.join(", ")} WHERE id = ?`, values);
+    }
     const [device] = await db.select().from(devices).where(eq(devices.id, id));
     return device;
   }
