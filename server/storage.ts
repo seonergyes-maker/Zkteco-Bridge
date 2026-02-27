@@ -34,7 +34,7 @@ export interface IStorage {
   getRecentEvents(limit?: number): Promise<AttendanceEvent[]>;
   getPendingEvents(): Promise<AttendanceEvent[]>;
   getPendingCount(): Promise<number>;
-  eventExists(deviceSerial: string, pin: string, timestamp: Date): Promise<boolean>;
+  eventExists(deviceSerial: string, pin: string, timestamp: Date, rawData?: string): Promise<boolean>;
   createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent>;
   markEventForwarded(id: number): Promise<void>;
   markEventForwardError(id: number, error: string): Promise<void>;
@@ -216,24 +216,45 @@ export class DatabaseStorage implements IStorage {
     return result?.count || 0;
   }
 
-  async eventExists(deviceSerial: string, pin: string, timestamp: Date): Promise<boolean> {
-    const [existing] = await db.select({ id: attendanceEvents.id }).from(attendanceEvents)
-      .where(and(
-        eq(attendanceEvents.deviceSerial, deviceSerial),
-        eq(attendanceEvents.pin, pin),
-        eq(attendanceEvents.timestamp, timestamp)
-      ))
-      .limit(1);
-    return !!existing;
+  async eventExists(deviceSerial: string, pin: string, timestamp: Date, rawData?: string): Promise<boolean> {
+    let tsStr: string | null = null;
+    if (rawData) {
+      const parts = rawData.split("\t");
+      const rawTime = parts[1]?.trim();
+      if (rawTime && /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(rawTime)) {
+        tsStr = rawTime;
+      }
+    }
+    if (!tsStr) {
+      const d = timestamp instanceof Date ? timestamp : new Date(timestamp as any);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      tsStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    const [rows] = await pool.query(
+      "SELECT id FROM attendance_events WHERE device_serial = ? AND pin = ? AND `timestamp` = ? LIMIT 1",
+      [deviceSerial, pin, tsStr]
+    ) as any;
+    return rows.length > 0;
   }
 
   async createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent> {
-    const d = data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp as any);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const tsStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    let tsStr: string | null = null;
+    const rawData = (data as any).rawData as string | undefined;
+    if (rawData) {
+      const parts = rawData.split("\t");
+      const rawTime = parts[1]?.trim();
+      if (rawTime && /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(rawTime)) {
+        tsStr = rawTime;
+      }
+    }
+    if (!tsStr) {
+      const d = data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp as any);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      tsStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
     const [result] = await pool.query(
       "INSERT INTO attendance_events (device_serial, pin, timestamp, status, verify, work_code, forwarded, raw_data) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
-      [data.deviceSerial, data.pin, tsStr, data.status ?? 0, data.verify ?? 0, data.workCode ?? null, (data as any).rawData ?? null]
+      [data.deviceSerial, data.pin, tsStr, data.status ?? 0, data.verify ?? 0, data.workCode ?? null, rawData ?? null]
     ) as any;
     const insertId = result.insertId;
     const [event] = await db.select().from(attendanceEvents).where(eq(attendanceEvents.id, insertId));
