@@ -165,11 +165,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateDeviceLastSeen(serial: string, ip?: string, firmware?: string, model?: string): Promise<void> {
-    const updateData: any = { lastSeen: new Date() };
-    if (ip) updateData.ipAddress = ip;
-    if (firmware) updateData.firmwareVersion = firmware;
-    if (model) updateData.model = model;
-    await db.update(devices).set(updateData).where(eq(devices.serialNumber, serial));
+    const sets: string[] = ["last_seen = NOW()"];
+    const vals: any[] = [];
+    if (ip) { sets.push("ip_address = ?"); vals.push(ip); }
+    if (firmware) { sets.push("firmware_version = ?"); vals.push(firmware); }
+    if (model) { sets.push("model = ?"); vals.push(model); }
+    vals.push(serial);
+    await pool.query(`UPDATE devices SET ${sets.join(", ")} WHERE serial_number = ?`, vals);
   }
 
   async updateDeviceStamps(serial: string, stamps: { attlogStamp?: string; operlogStamp?: string; attphotoStamp?: string }): Promise<void> {
@@ -226,14 +228,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEvent(data: InsertAttendanceEvent): Promise<AttendanceEvent> {
-    const result = await db.insert(attendanceEvents).values(data);
-    const insertId = result[0].insertId;
+    const d = data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp as any);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const tsStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const [result] = await pool.query(
+      "INSERT INTO attendance_events (device_serial, pin, timestamp, status, verify, work_code, forwarded, raw_data) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+      [data.deviceSerial, data.pin, tsStr, data.status ?? 0, data.verify ?? 0, data.workCode ?? null, (data as any).rawData ?? null]
+    ) as any;
+    const insertId = result.insertId;
     const [event] = await db.select().from(attendanceEvents).where(eq(attendanceEvents.id, insertId));
     return event;
   }
 
   async markEventForwarded(id: number): Promise<void> {
-    await db.update(attendanceEvents).set({ forwarded: true, forwardedAt: new Date(), forwardError: null }).where(eq(attendanceEvents.id, id));
+    await pool.query(
+      "UPDATE attendance_events SET forwarded = 1, forwarded_at = NOW(), forward_error = NULL WHERE id = ?",
+      [id]
+    );
   }
 
   async markEventForwardError(id: number, error: string): Promise<void> {
@@ -289,12 +300,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCommandResult(commandId: string, returnValue: string, returnData?: string): Promise<void> {
-    await db.update(deviceCommands).set({
-      status: "executed",
-      returnValue,
-      returnData: returnData || null,
-      executedAt: new Date(),
-    }).where(eq(deviceCommands.commandId, commandId));
+    await pool.query(
+      "UPDATE device_commands SET status = 'executed', return_value = ?, return_data = ?, executed_at = NOW() WHERE command_id = ?",
+      [returnValue, returnData || null, commandId]
+    );
   }
 
   async clearCommandHistory(): Promise<void> {
@@ -328,7 +337,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateDeviceUser(id: number, data: Partial<InsertDeviceUser>): Promise<DeviceUser | undefined> {
-    await db.update(deviceUsers).set({ ...data, updatedAt: new Date() }).where(eq(deviceUsers.id, id));
+    await db.update(deviceUsers).set({ ...data, updatedAt: sql`NOW()` }).where(eq(deviceUsers.id, id));
     const [user] = await db.select().from(deviceUsers).where(eq(deviceUsers.id, id));
     return user;
   }
@@ -360,7 +369,7 @@ export class DatabaseStorage implements IStorage {
     if (!synced.includes(deviceSerial)) {
       synced.push(deviceSerial);
     }
-    await db.update(deviceUsers).set({ syncedToDevices: JSON.stringify(synced), updatedAt: new Date() }).where(eq(deviceUsers.id, id));
+    await db.update(deviceUsers).set({ syncedToDevices: JSON.stringify(synced), updatedAt: sql`NOW()` }).where(eq(deviceUsers.id, id));
   }
 
   async getUnsyncedUsersForDevice(clientId: number, deviceSerial: string): Promise<DeviceUser[]> {
